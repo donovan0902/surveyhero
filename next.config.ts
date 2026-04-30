@@ -4,8 +4,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {};
 
 const requiredProductionEnv = [
-  "ELEVENLABS_API_KEY",
-  "ELEVENLABS_WEBHOOK_SECRET",
   "NEXT_PUBLIC_CONVEX_URL",
 ] as const;
 

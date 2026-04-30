@@ -1,9 +1,4 @@
-import {
-  action,
-  internalMutation,
-  internalQuery,
-  mutation,
-} from "./_generated/server";
+import { action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -155,28 +150,6 @@ export const handlePostCallWebhook = internalMutation({
     ),
   },
   handler: async (ctx, args): Promise<void> => {
-    await ingestPostCallWebhook(ctx, args);
-  },
-});
-
-export const ingestVerifiedPostCallWebhook = mutation({
-  args: {
-    webhookSecret: v.string(),
-    agentId: v.string(),
-    conversationId: v.string(),
-    responseIdFromElevenLabsUserId: v.optional(v.string()),
-    dataCollectionResults: v.array(
-      v.object({
-        dataCollectionId: v.string(),
-        value: extractedValueValidator,
-      }),
-    ),
-  },
-  handler: async (ctx, args): Promise<void> => {
-    if (args.webhookSecret !== process.env.ELEVENLABS_WEBHOOK_SECRET) {
-      throw new Error("Invalid webhook secret");
-    }
-
     await ingestPostCallWebhook(ctx, args);
   },
 });
