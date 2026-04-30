@@ -1,5 +1,24 @@
-import type { NextConfig } from 'next';
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {};
 
-export default nextConfig;
+const requiredProductionEnv = [
+  "ELEVENLABS_API_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+  "NEXT_PUBLIC_CONVEX_URL",
+] as const;
+
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    const missing = requiredProductionEnv.filter((name) => !process.env[name]);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required production environment variables: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  return nextConfig;
+}

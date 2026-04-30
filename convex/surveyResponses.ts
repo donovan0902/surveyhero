@@ -1,8 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { transcriptEntryValidator } from "./schema";
 
 async function requireUser(
   ctx: MutationCtx | QueryCtx,
@@ -37,31 +36,7 @@ export const getOrCreate = mutation({
       surveyId: args.surveyId,
       respondentId: user._id,
       status: "in-progress",
-      transcript: [],
       startedAtMs: Date.now(),
-    });
-  },
-});
-
-// Append transcript entries incrementally during the voice session.
-export const appendTranscript = mutation({
-  args: {
-    responseId: v.id("surveyResponses"),
-    entries: v.array(transcriptEntryValidator),
-  },
-  handler: async (ctx, args): Promise<void> => {
-    const user = await requireUser(ctx);
-    const response = await ctx.db.get(args.responseId);
-
-    if (!response || response.respondentId !== user._id) {
-      throw new Error("Response not found or access denied");
-    }
-    if (response.status === "completed") {
-      throw new Error("Cannot append to a completed response");
-    }
-
-    await ctx.db.patch(args.responseId, {
-      transcript: [...response.transcript, ...args.entries],
     });
   },
 });
@@ -72,6 +47,7 @@ export const recordAnswer = mutation({
     responseId: v.id("surveyResponses"),
     questionId: v.id("questions"),
     response: v.string(),
+    dataCollectionId: v.string(),
   },
   handler: async (ctx, args): Promise<Id<"questionResponses">> => {
     const user = await requireUser(ctx);
@@ -87,6 +63,26 @@ export const recordAnswer = mutation({
       surveyId: surveyResponse.surveyId,
       respondentId: user._id,
       response: args.response,
+      dataCollectionId: args.dataCollectionId,
+    });
+  },
+});
+
+export const attachConversation = mutation({
+  args: {
+    responseId: v.id("surveyResponses"),
+    conversationId: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const user = await requireUser(ctx);
+    const response = await ctx.db.get(args.responseId);
+
+    if (!response || response.respondentId !== user._id) {
+      throw new Error("Response not found or access denied");
+    }
+
+    await ctx.db.patch(args.responseId, {
+      elevenLabsConversationId: args.conversationId,
     });
   },
 });
@@ -193,5 +189,43 @@ export const getAnswersForQuestion = query({
       .query("questionResponses")
       .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
       .collect();
+  },
+});
+
+export const upsertExtractedAnswer = internalMutation({
+  args: {
+    responseId: v.id("surveyResponses"),
+    questionId: v.id("questions"),
+    dataCollectionId: v.string(),
+    response: v.string(),
+  },
+  handler: async (ctx, args): Promise<Id<"questionResponses">> => {
+    const surveyResponse = await ctx.db.get(args.responseId);
+    if (!surveyResponse) throw new Error("Response not found");
+
+    const existing = await ctx.db
+      .query("questionResponses")
+      .withIndex("by_surveyResponseId_and_questionId", (q) =>
+        q
+          .eq("surveyResponseId", args.responseId)
+          .eq("questionId", args.questionId),
+      )
+      .unique();
+
+    const fields = {
+      surveyResponseId: args.responseId,
+      questionId: args.questionId,
+      surveyId: surveyResponse.surveyId,
+      respondentId: surveyResponse.respondentId,
+      response: args.response,
+      dataCollectionId: args.dataCollectionId,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, fields);
+      return existing._id;
+    }
+
+    return ctx.db.insert("questionResponses", fields);
   },
 });

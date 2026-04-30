@@ -9,6 +9,10 @@ const statusConfig: Record<
     label: "Ready to start",
     dotClass: "bg-muted-foreground/40",
   },
+  connecting: {
+    label: "Connecting...",
+    dotClass: "bg-amber-400 animate-pulse",
+  },
   "agent-speaking": {
     label: "Agent is speaking...",
     dotClass: "bg-primary animate-pulse",
@@ -20,6 +24,10 @@ const statusConfig: Record<
   processing: {
     label: "Processing...",
     dotClass: "bg-amber-400 animate-pulse",
+  },
+  error: {
+    label: "Connection error",
+    dotClass: "bg-destructive",
   },
 };
 

@@ -11,9 +11,14 @@ interface MicButtonProps {
 
 export function MicButton({ status, onPress }: MicButtonProps) {
   const isListening = status === "user-speaking";
-  const isProcessing = status === "processing";
+  const isProcessing = status === "processing" || status === "connecting";
   const isAgentSpeaking = status === "agent-speaking";
-  const isDisabled = isProcessing || isAgentSpeaking;
+  const isDisabled = isProcessing;
+  const isActiveSession =
+    status === "agent-speaking" ||
+    status === "user-speaking" ||
+    status === "processing" ||
+    status === "connecting";
 
   return (
     <div className="relative flex items-center justify-center">
@@ -30,14 +35,15 @@ export function MicButton({ status, onPress }: MicButtonProps) {
 
       <button
         onClick={isDisabled ? undefined : onPress}
-        aria-label={isListening ? "Stop recording" : "Start recording"}
+        aria-label={isActiveSession ? "End conversation" : "Start conversation"}
         disabled={isDisabled}
         className={cn(
           "relative z-10 flex size-16 items-center justify-center rounded-full shadow-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring",
           isListening &&
             "bg-primary text-primary-foreground scale-110 shadow-primary/30",
           isProcessing && "bg-muted text-muted-foreground cursor-wait",
-          isAgentSpeaking && "bg-muted text-muted-foreground cursor-default",
+          isAgentSpeaking &&
+            "bg-muted text-muted-foreground hover:bg-muted/80",
           !isListening &&
             !isProcessing &&
             !isAgentSpeaking &&
@@ -46,7 +52,7 @@ export function MicButton({ status, onPress }: MicButtonProps) {
       >
         {isProcessing ? (
           <Loader2 className="size-6 animate-spin" />
-        ) : isListening ? (
+        ) : isActiveSession ? (
           <MicOff className="size-6" />
         ) : (
           <Mic className="size-6" />
