@@ -20,6 +20,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@convex-dev/workos-authkit": "^0.2.2",
     "@workos-inc/authkit-nextjs": "^2.17.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

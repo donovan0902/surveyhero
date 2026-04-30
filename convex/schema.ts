@@ -1,12 +1,84 @@
-import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
-// The schema is entirely optional.
-// You can delete this file (schema.ts) and the
-// app will continue to work.
-// The schema provides more precise TypeScript types.
+export const transcriptEntryValidator = v.object({
+  id: v.string(),
+  role: v.union(v.literal("agent"), v.literal("respondent")),
+  text: v.string(),
+  timestampMs: v.number(),
+});
+
 export default defineSchema({
-  numbers: defineTable({
-    value: v.number(),
-  }),
+  // Populated entirely by WorkOS webhooks via authKit.events().
+  // authId = WorkOS user ID (event.data.id = identity.subject from JWT).
+  users: defineTable({
+    authId: v.string(),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+    pictureUrl: v.optional(v.string()),
+  }).index("by_authId", ["authId"]),
+
+  // Questions live in a separate table to enable efficient per-question queries.
+  surveys: defineTable({
+    creatorId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("published"),
+      v.literal("closed"),
+    ),
+  }).index("by_creatorId", ["creatorId"]),
+
+  // Separate table so questionResponses can be indexed per-question.
+  questions: defineTable({
+    surveyId: v.id("surveys"),
+    order: v.number(),
+    prompt: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("open-ended"),
+      v.literal("closed"),
+      v.literal("rating"),
+      v.literal("yes-no"),
+    ),
+    options: v.optional(v.array(v.string())),
+    required: v.boolean(),
+    followUpBehavior: v.union(
+      v.literal("none"),
+      v.literal("probe-once"),
+      v.literal("probe-until-answered"),
+    ),
+  })
+    .index("by_surveyId", ["surveyId"])
+    .index("by_surveyId_and_order", ["surveyId", "order"]),
+
+  // One session per (respondent × survey). Holds the full voice transcript.
+  surveyResponses: defineTable({
+    surveyId: v.id("surveys"),
+    respondentId: v.id("users"),
+    status: v.union(
+      v.literal("in-progress"),
+      v.literal("completed"),
+      v.literal("abandoned"),
+    ),
+    transcript: v.array(transcriptEntryValidator),
+    startedAtMs: v.number(),
+    completedAtMs: v.optional(v.number()),
+  })
+    .index("by_surveyId", ["surveyId"])
+    .index("by_respondentId", ["respondentId"])
+    .index("by_surveyId_and_respondentId", ["surveyId", "respondentId"]),
+
+  // One record per (respondent × question). Enables "all answers to question X".
+  questionResponses: defineTable({
+    surveyResponseId: v.id("surveyResponses"),
+    questionId: v.id("questions"),
+    surveyId: v.id("surveys"),
+    respondentId: v.id("users"),
+    response: v.string(),
+  })
+    .index("by_questionId", ["questionId"])
+    .index("by_surveyResponseId", ["surveyResponseId"])
+    .index("by_surveyId", ["surveyId"]),
 });
