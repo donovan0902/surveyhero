@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Eye, Save, Send, Mic } from "lucide-react";
 import Link from "next/link";
+import { AuthStatus } from "@/components/AuthStatus";
 
 interface BuilderTopBarProps {
   title: string;
@@ -56,6 +57,9 @@ export function BuilderTopBar({
         <Send className="size-3.5" />
         Publish
       </Button>
+
+      <Separator orientation="vertical" className="h-5" />
+      <AuthStatus />
     </header>
   );
 }
