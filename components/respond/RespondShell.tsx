@@ -1,31 +1,25 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from 'react';
 import {
   ConversationProvider,
   useConversationControls,
   useConversationMode,
   useConversationStatus,
-} from "@elevenlabs/react";
-import type { Callbacks, Conversation } from "@elevenlabs/client";
-import { useAction, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { RespondHeader } from "./RespondHeader";
-import { ConversationTranscript } from "./ConversationTranscript";
-import { VoiceControlPanel } from "./VoiceControlPanel";
+} from '@elevenlabs/react';
+import type { Callbacks, Conversation } from '@elevenlabs/client';
+import { useAction, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import { RespondHeader } from './RespondHeader';
+import { ConversationTranscript } from './ConversationTranscript';
+import { VoiceControlPanel } from './VoiceControlPanel';
 
-export type AgentStatus =
-  | "idle"
-  | "connecting"
-  | "agent-speaking"
-  | "user-speaking"
-  | "processing"
-  | "error";
+export type AgentStatus = 'idle' | 'connecting' | 'agent-speaking' | 'user-speaking' | 'processing' | 'error';
 
 export interface TranscriptEntry {
   id: string;
-  role: "agent" | "respondent";
+  role: 'agent' | 'respondent';
   text: string;
   timestamp: Date;
 }
@@ -35,47 +29,42 @@ interface RespondShellProps {
 }
 
 type VoiceSession = {
-  responseId: Id<"surveyResponses">;
+  responseId: Id<'surveyResponses'>;
   signedUrl: string;
   agentId: string;
   surveyTitle: string;
   totalQuestions: number;
 };
 
-type ConversationMessage = Parameters<NonNullable<Callbacks["onMessage"]>>[0];
+type ConversationMessage = Parameters<NonNullable<Callbacks['onMessage']>>[0];
 
 export function RespondShell({ surveyId }: RespondShellProps) {
   return (
     <ConversationProvider>
-      <RespondConversation surveyId={surveyId as Id<"surveys">} />
+      <RespondConversation surveyId={surveyId as Id<'surveys'>} />
     </ConversationProvider>
   );
 }
 
-function RespondConversation({ surveyId }: { surveyId: Id<"surveys"> }) {
+function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
   const { startSession, endSession } = useConversationControls();
-  const { status: conversationStatus, message: statusMessage } =
-    useConversationStatus();
+  const { status: conversationStatus, message: statusMessage } = useConversationStatus();
   const mode = useConversationMode();
   const startVoiceResponse = useAction(api.elevenlabs.startVoiceResponse);
   const attachConversation = useMutation(api.surveyResponses.attachConversation);
 
-  const [status, setStatus] = useState<AgentStatus>("idle");
+  const [status, setStatus] = useState<AgentStatus>('idle');
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [session, setSession] = useState<VoiceSession | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const currentStatus = getAgentStatus(status, conversationStatus, mode);
-  const isSessionActive =
-    currentStatus !== "idle" && currentStatus !== "error";
-  const currentQuestion = Math.max(
-    1,
-    transcript.filter((entry) => entry.role === "agent").length,
-  );
+  const isSessionActive = currentStatus !== 'idle' && currentStatus !== 'error';
+  const currentQuestion = Math.max(1, transcript.filter((entry) => entry.role === 'agent').length);
   const totalQuestions = session?.totalQuestions ?? 1;
 
   async function handleStart() {
-    setStatus("connecting");
+    setStatus('connecting');
     setErrorMessage(null);
     setTranscript([]);
 
@@ -98,31 +87,37 @@ function RespondConversation({ surveyId }: { surveyId: Id<"surveys"> }) {
           });
         },
         onConnect: () => {
-          setStatus("processing");
+          setStatus('processing');
         },
         onDisconnect: () => {
-          setStatus("idle");
+          setStatus('idle');
         },
         onMessage: appendConversationMessage,
         onError: (message) => {
           setErrorMessage(String(message));
-          setStatus("error");
+          setStatus('error');
         },
       });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to start voice survey",
-      );
-      setStatus("error");
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to start voice survey');
+      setStatus('error');
     }
   }
 
-  function handleStop() {
-    if (conversationStatus === "connected") {
+  async function handleStop() {
+    if (conversationStatus === 'connected') {
       endSession();
     }
-    setStatus("idle");
+    setStatus('idle');
   }
+
+  useEffect(() => {
+    return () => {
+      if (conversationStatus === 'connected') {
+        void endSession();
+      }
+    };
+  }, [conversationStatus, endSession]);
 
   function appendConversationMessage(message: ConversationMessage) {
     if (!message.message) return;
@@ -131,7 +126,7 @@ function RespondConversation({ surveyId }: { surveyId: Id<"surveys"> }) {
       ...prev,
       {
         id: crypto.randomUUID(),
-        role: message.role === "agent" ? "agent" : "respondent",
+        role: message.role === 'agent' ? 'agent' : 'respondent',
         text: message.message,
         timestamp: new Date(),
       },
@@ -141,7 +136,7 @@ function RespondConversation({ surveyId }: { surveyId: Id<"surveys"> }) {
   return (
     <div className="flex h-screen flex-col bg-background">
       <RespondHeader
-        title={session?.surveyTitle ?? "Voice survey"}
+        title={session?.surveyTitle ?? 'Voice survey'}
         currentQuestion={Math.min(currentQuestion, totalQuestions)}
         totalQuestions={totalQuestions}
         isActive={isSessionActive}
@@ -151,39 +146,28 @@ function RespondConversation({ surveyId }: { surveyId: Id<"surveys"> }) {
           {errorMessage ?? statusMessage}
         </div>
       )}
-      <ConversationTranscript
-        transcript={transcript}
-        status={currentStatus}
-        className="flex-1"
-      />
-      <VoiceControlPanel
-        status={currentStatus}
-        onStart={handleStart}
-        onStop={handleStop}
-      />
+      <ConversationTranscript transcript={transcript} status={currentStatus} className="flex-1" />
+      <VoiceControlPanel status={currentStatus} onStart={handleStart} onStop={handleStop} />
     </div>
   );
 }
 
 function getAgentStatus(
   optimisticStatus: AgentStatus,
-  conversationStatus: "disconnected" | "connecting" | "connected" | "error",
+  conversationStatus: 'disconnected' | 'connecting' | 'connected' | 'error',
   mode: { isSpeaking: boolean; isListening: boolean },
 ): AgentStatus {
-  if (optimisticStatus === "error" || conversationStatus === "error") {
-    return "error";
+  if (optimisticStatus === 'error' || conversationStatus === 'error') {
+    return 'error';
   }
-  if (conversationStatus === "connected") {
-    if (mode.isSpeaking) return "agent-speaking";
-    if (mode.isListening) return "user-speaking";
-    return "processing";
+  if (conversationStatus === 'connected') {
+    if (mode.isSpeaking) return 'agent-speaking';
+    if (mode.isListening) return 'user-speaking';
+    return 'processing';
   }
-  if (
-    optimisticStatus === "connecting" ||
-    conversationStatus === "connecting"
-  ) {
-    return "connecting";
+  if (optimisticStatus === 'connecting' || conversationStatus === 'connecting') {
+    return 'connecting';
   }
-  if (conversationStatus === "disconnected") return "idle";
-  return "processing";
+  if (conversationStatus === 'disconnected') return 'idle';
+  return 'processing';
 }

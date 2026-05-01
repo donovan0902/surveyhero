@@ -1,86 +1,147 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
+import Link from "next/link";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { BuilderTopBar } from "./BuilderTopBar";
 import { QuestionSidebar } from "./QuestionSidebar";
 import { QuestionCanvas } from "./QuestionCanvas";
 import { QuestionSettingsPanel } from "./QuestionSettingsPanel";
 
-export type QuestionType = "open-ended" | "closed" | "rating" | "yes-no";
-
-export interface Question {
-  id: string;
-  order: number;
-  prompt: string;
-  description?: string;
-  type: QuestionType;
-  options?: string[];
-  required: boolean;
-  followUpBehavior: "none" | "probe-once" | "probe-until-answered";
-}
+export type QuestionType = Doc<"questions">["type"];
+export type Question = Doc<"questions">;
+export type SaveStatus = "saving" | "saved";
 
 interface BuilderShellProps {
   surveyId: string;
 }
 
-export function BuilderShell({ surveyId }: BuilderShellProps) {
-  const [title, setTitle] = useState("Untitled Survey");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
+  const surveyId = rawId as Id<"surveys">;
 
-  const selectedQuestion = questions.find((q) => q.id === selectedId) ?? null;
+  const survey = useQuery(api.surveys.get, { surveyId });
+  const questions = useQuery(api.questions.listForSurvey, { surveyId });
 
-  const addQuestion = useCallback(() => {
-    const newQuestion: Question = {
-      id: crypto.randomUUID(),
-      order: questions.length + 1,
-      prompt: "",
-      type: "open-ended",
-      required: false,
-      followUpBehavior: "none",
-    };
-    setQuestions((prev) => [...prev, newQuestion]);
-    setSelectedId(newQuestion.id);
-  }, [questions.length]);
+  const updateTitle = useMutation(api.surveys.updateTitle);
+  const updateStatus = useMutation(api.surveys.updateStatus);
+  const createQuestion = useMutation(api.questions.create);
+  const updateQuestionMutation = useMutation(api.questions.update);
+  const removeQuestion = useMutation(api.questions.remove);
+  const reorderQuestionsMutation = useMutation(api.questions.reorder);
 
-  const updateQuestion = useCallback((id: string, patch: Partial<Question>) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, ...patch } : q))
-    );
+  const [selectedId, setSelectedId] = useState<Id<"questions"> | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const track = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
+    setPendingCount((n) => n + 1);
+    return promise.finally(() => setPendingCount((n) => n - 1));
   }, []);
 
-  const deleteQuestion = useCallback(
-    (id: string) => {
-      setQuestions((prev) => {
-        const next = prev
-          .filter((q) => q.id !== id)
-          .map((q, i) => ({ ...q, order: i + 1 }));
-        return next;
-      });
-      setSelectedId((prev) => {
-        if (prev !== id) return prev;
-        const remaining = questions.filter((q) => q.id !== id);
-        return remaining.length > 0 ? remaining[0].id : null;
-      });
+  const selectedQuestion =
+    questions?.find((q) => q._id === selectedId) ?? null;
+
+  const handleTitleChange = useCallback(
+    (title: string) => {
+      void track(updateTitle({ surveyId, title }));
     },
-    [questions]
+    [surveyId, updateTitle, track],
   );
 
-  const reorderQuestions = useCallback((fromIndex: number, toIndex: number) => {
-    setQuestions((prev) => {
-      const next = [...prev];
+  const handleStatusChange = useCallback(
+    async (status: Doc<"surveys">["status"]) => {
+      await track(updateStatus({ surveyId, status }));
+    },
+    [surveyId, updateStatus, track],
+  );
+
+  const addQuestion = useCallback(async () => {
+    const newId = await track(
+      createQuestion({
+        surveyId,
+        prompt: "",
+        type: "open-ended",
+      }),
+    );
+    setSelectedId(newId);
+  }, [surveyId, createQuestion, track]);
+
+  const updateQuestion = useCallback(
+    (id: Id<"questions">, patch: Partial<Doc<"questions">>) => {
+      void track(
+        updateQuestionMutation({
+          questionId: id,
+          prompt: patch.prompt,
+          description: patch.description,
+          type: patch.type,
+          options: patch.options,
+          required: patch.required,
+          followUpBehavior: patch.followUpBehavior,
+        }),
+      );
+    },
+    [updateQuestionMutation, track],
+  );
+
+  const deleteQuestion = useCallback(
+    (id: Id<"questions">) => {
+      if (selectedId === id) {
+        const idx = questions?.findIndex((q) => q._id === id) ?? -1;
+        const fallback = questions?.[idx + 1] ?? questions?.[idx - 1] ?? null;
+        setSelectedId(fallback?._id ?? null);
+      }
+      void track(removeQuestion({ questionId: id }));
+    },
+    [removeQuestion, selectedId, questions, track],
+  );
+
+  const reorderQuestions = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (!questions) return;
+      const next = [...questions];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
-      return next.map((q, i) => ({ ...q, order: i + 1 }));
-    });
-  }, []);
+      void track(
+        reorderQuestionsMutation({
+          surveyId,
+          orderedIds: next.map((q) => q._id),
+        }),
+      );
+    },
+    [surveyId, questions, reorderQuestionsMutation, track],
+  );
+
+  if (survey === undefined || questions === undefined) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+
+  if (survey === null) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background text-center">
+        <p className="text-sm font-medium">Survey not found</p>
+        <p className="text-xs text-muted-foreground">
+          It may have been deleted, or you may not have access.
+        </p>
+        <Link href="/" className="mt-2 text-xs text-primary underline">
+          Back to home
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <BuilderTopBar
-        title={title}
-        onTitleChange={setTitle}
-        surveyId={surveyId}
+        survey={survey}
+        questionCount={questions.length}
+        saveStatus={pendingCount > 0 ? "saving" : "saved"}
+        onTitleChange={handleTitleChange}
+        onStatusChange={handleStatusChange}
       />
       <div className="flex flex-1 overflow-hidden">
         <QuestionSidebar

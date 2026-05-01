@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Question } from "./BuilderShell";
+import type { Id } from "@/convex/_generated/dataModel";
 
 interface QuestionSettingsPanelProps {
   question: Question | null;
@@ -51,7 +52,7 @@ export function QuestionSettingsPanel({
                 <Switch
                   checked={question.required}
                   onCheckedChange={(v) =>
-                    onUpdate(question.id, { required: v })
+                    onUpdate(question._id, { required: v })
                   }
                 />
               </div>
@@ -68,7 +69,7 @@ export function QuestionSettingsPanel({
               <Select
                 value={question.followUpBehavior}
                 onValueChange={(v) =>
-                  onUpdate(question.id, {
+                  onUpdate(question._id, {
                     followUpBehavior: v as Question["followUpBehavior"],
                   })
                 }
@@ -97,7 +98,7 @@ export function QuestionSettingsPanel({
                 Question ID
               </Label>
               <code className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground break-all">
-                {question.id}
+                {question._id}
               </code>
             </div>
           </div>

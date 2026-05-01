@@ -6,13 +6,14 @@ import { Separator } from "@/components/ui/separator";
 import { Plus } from "lucide-react";
 import { QuestionSidebarItem } from "./QuestionSidebarItem";
 import type { Question } from "./BuilderShell";
+import type { Id } from "@/convex/_generated/dataModel";
 
 interface QuestionSidebarProps {
   questions: Question[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedId: Id<"questions"> | null;
+  onSelect: (id: Id<"questions">) => void;
   onAdd: () => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: Id<"questions">) => void;
   onReorder: (from: number, to: number) => void;
 }
 
@@ -55,12 +56,12 @@ export function QuestionSidebar({
           <div className="flex flex-col gap-1">
             {questions.map((q, index) => (
               <QuestionSidebarItem
-                key={q.id}
+                key={q._id}
                 question={q}
                 index={index}
-                isSelected={q.id === selectedId}
-                onSelect={() => onSelect(q.id)}
-                onDelete={() => onDelete(q.id)}
+                isSelected={q._id === selectedId}
+                onSelect={() => onSelect(q._id)}
+                onDelete={() => onDelete(q._id)}
               />
             ))}
           </div>

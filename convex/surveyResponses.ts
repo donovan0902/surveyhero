@@ -17,6 +17,20 @@ async function requireUser(
   return user;
 }
 
+async function getOptionalUser(
+  ctx: MutationCtx | QueryCtx,
+): Promise<Doc<"users"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+    .unique();
+  if (!user) throw new Error("User not found");
+  return user;
+}
+
 // Start or resume a response session. Enforces one per (respondent × survey).
 export const getOrCreate = mutation({
   args: { surveyId: v.id("surveys") },
@@ -74,11 +88,18 @@ export const attachConversation = mutation({
     conversationId: v.string(),
   },
   handler: async (ctx, args): Promise<void> => {
-    const user = await requireUser(ctx);
+    const user = await getOptionalUser(ctx);
     const response = await ctx.db.get(args.responseId);
 
-    if (!response || response.respondentId !== user._id) {
+    if (!response) {
       throw new Error("Response not found or access denied");
+    }
+    if (response.respondentId) {
+      if (!user || response.respondentId !== user._id) {
+        throw new Error("Response not found or access denied");
+      }
+    } else if (response.elevenLabsConversationId) {
+      throw new Error("Response already has a conversation attached");
     }
 
     await ctx.db.patch(args.responseId, {
@@ -216,7 +237,9 @@ export const upsertExtractedAnswer = internalMutation({
       surveyResponseId: args.responseId,
       questionId: args.questionId,
       surveyId: surveyResponse.surveyId,
-      respondentId: surveyResponse.respondentId,
+      ...(surveyResponse.respondentId
+        ? { respondentId: surveyResponse.respondentId }
+        : {}),
       response: args.response,
       dataCollectionId: args.dataCollectionId,
     };

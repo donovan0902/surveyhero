@@ -49,10 +49,11 @@ export default defineSchema({
     .index("by_surveyId", ["surveyId"])
     .index("by_surveyId_and_order", ["surveyId", "order"]),
 
-  // One session per (respondent x survey). Transcript text remains in ElevenLabs.
+  // Authenticated respondents are limited to one session per survey. Anonymous
+  // voice respondents omit respondentId and create a fresh response per start.
   surveyResponses: defineTable({
     surveyId: v.id("surveys"),
-    respondentId: v.id("users"),
+    respondentId: v.optional(v.id("users")),
     status: v.union(
       v.literal("in-progress"),
       v.literal("completed"),
@@ -68,12 +69,12 @@ export default defineSchema({
     .index("by_elevenLabsConversationId", ["elevenLabsConversationId"])
     .index("by_surveyId_and_respondentId", ["surveyId", "respondentId"]),
 
-  // One record per (respondent × question). Enables "all answers to question X".
+  // One record per response/question. respondentId is present for signed-in respondents.
   questionResponses: defineTable({
     surveyResponseId: v.id("surveyResponses"),
     questionId: v.id("questions"),
     surveyId: v.id("surveys"),
-    respondentId: v.id("users"),
+    respondentId: v.optional(v.id("users")),
     response: v.string(),
     dataCollectionId: v.string(),
   })

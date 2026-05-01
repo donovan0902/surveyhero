@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -9,14 +10,39 @@ import { Mic, Info } from "lucide-react";
 import { QuestionTypeSelector } from "./QuestionTypeSelector";
 import { EmptyCanvas } from "./EmptyCanvas";
 import type { Question } from "./BuilderShell";
+import type { Id } from "@/convex/_generated/dataModel";
+import { useDebouncedCallback } from "@/lib/useDebouncedCallback";
 
 interface QuestionCanvasProps {
   question: Question | null;
-  onUpdate: (id: string, patch: Partial<Question>) => void;
+  onUpdate: (id: Id<"questions">, patch: Partial<Question>) => void;
 }
 
 export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
   if (!question) return <EmptyCanvas />;
+  return <QuestionCanvasInner key={question._id} question={question} onUpdate={onUpdate} />;
+}
+
+function QuestionCanvasInner({
+  question,
+  onUpdate,
+}: {
+  question: Question;
+  onUpdate: (id: Id<"questions">, patch: Partial<Question>) => void;
+}) {
+  const [prompt, setPrompt] = useState(question.prompt);
+  const [description, setDescription] = useState(question.description ?? "");
+  const [options, setOptions] = useState<string[]>(question.options ?? [""]);
+
+  const debouncedSavePrompt = useDebouncedCallback((value: string) => {
+    onUpdate(question._id, { prompt: value });
+  }, 400);
+  const debouncedSaveDescription = useDebouncedCallback((value: string) => {
+    onUpdate(question._id, { description: value });
+  }, 400);
+  const debouncedSaveOptions = useDebouncedCallback((value: string[]) => {
+    onUpdate(question._id, { options: value });
+  }, 400);
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden bg-muted/30">
@@ -31,7 +57,7 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
             </div>
             <QuestionTypeSelector
               value={question.type}
-              onChange={(type) => onUpdate(question.id, { type })}
+              onChange={(type) => onUpdate(question._id, { type })}
             />
           </div>
 
@@ -50,10 +76,11 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
             </CardHeader>
             <CardContent className="px-5 pb-5">
               <Textarea
-                value={question.prompt}
-                onChange={(e) =>
-                  onUpdate(question.id, { prompt: e.target.value })
-                }
+                value={prompt}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  debouncedSavePrompt(e.target.value);
+                }}
                 placeholder='e.g. "On a scale of 1 to 10, how satisfied were you with your experience today?"'
                 className="min-h-[120px] resize-y text-sm leading-relaxed"
               />
@@ -78,10 +105,11 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
             </CardHeader>
             <CardContent className="px-5 pb-5">
               <Textarea
-                value={question.description ?? ""}
-                onChange={(e) =>
-                  onUpdate(question.id, { description: e.target.value })
-                }
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  debouncedSaveDescription(e.target.value);
+                }}
                 placeholder='e.g. "Accept any number. If they hesitate, remind them there are no wrong answers."'
                 className="min-h-[80px] resize-y text-sm text-muted-foreground"
               />
@@ -100,7 +128,7 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
               </CardHeader>
               <CardContent className="px-5 pb-5">
                 <div className="flex flex-col gap-2">
-                  {(question.options ?? [""]).map((opt, i) => (
+                  {options.map((opt, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-xs font-mono text-muted-foreground w-4">
                         {i + 1}.
@@ -108,9 +136,10 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
                       <Input
                         value={opt}
                         onChange={(e) => {
-                          const next = [...(question.options ?? [""])];
+                          const next = [...options];
                           next[i] = e.target.value;
-                          onUpdate(question.id, { options: next });
+                          setOptions(next);
+                          debouncedSaveOptions(next);
                         }}
                         className="h-8 text-sm"
                         placeholder={`Option ${i + 1}`}
@@ -120,8 +149,9 @@ export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
                   <button
                     type="button"
                     onClick={() => {
-                      const next = [...(question.options ?? [""]), ""];
-                      onUpdate(question.id, { options: next });
+                      const next = [...options, ""];
+                      setOptions(next);
+                      onUpdate(question._id, { options: next });
                     }}
                     className="mt-1 text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
