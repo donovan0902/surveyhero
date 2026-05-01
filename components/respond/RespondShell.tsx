@@ -9,6 +9,7 @@ import {
 } from '@elevenlabs/react';
 import type { Callbacks, Conversation } from '@elevenlabs/client';
 import { useAction, useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
@@ -100,13 +101,12 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
         },
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '';
-      if (msg.includes('already completed')) {
+      if (error instanceof ConvexError && typeof error.data === 'string' && error.data.includes('already completed')) {
         toast.error("You've already responded to this survey", {
           description: 'Each survey can only be completed once per person.',
         });
       } else {
-        setErrorMessage(msg || 'Failed to start voice survey');
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to start voice survey');
         setStatus('error');
       }
     }
