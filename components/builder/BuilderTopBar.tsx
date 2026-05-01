@@ -4,7 +4,15 @@ import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, FilePlus, Inbox, Mic, Send, Loader2 } from "lucide-react";
+import {
+  Eye,
+  FilePlus,
+  Inbox,
+  LayoutDashboard,
+  Mic,
+  Send,
+  Loader2,
+} from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -115,6 +123,13 @@ export function BuilderTopBar({
         <FilePlus className="size-3.5" />
         New
       </Button>
+
+      <Link href="/dashboard">
+        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+          <LayoutDashboard className="size-3.5" />
+          Dashboard
+        </Button>
+      </Link>
 
       <div className="flex-1" />
 

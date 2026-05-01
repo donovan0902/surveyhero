@@ -3,6 +3,19 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
+const RESPONSE_COUNT_LIMIT = 1000;
+
+type CreatedSurveyDashboardRow = {
+  survey: Doc<"surveys">;
+  questionCount: number;
+  responseCount: number;
+  responseCountIsCapped: boolean;
+  completedCount: number;
+  inProgressCount: number;
+  abandonedCount: number;
+  lastResponseAtMs: number | null;
+};
+
 async function requireUser(
   ctx: MutationCtx | QueryCtx,
 ): Promise<Doc<"users">> {
@@ -109,5 +122,59 @@ export const listMine = query({
       .withIndex("by_creatorId", (q) => q.eq("creatorId", user._id))
       .order("desc")
       .take(50);
+  },
+});
+
+export const listDashboard = query({
+  args: {},
+  handler: async (ctx): Promise<CreatedSurveyDashboardRow[]> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const surveys = await ctx.db
+      .query("surveys")
+      .withIndex("by_creatorId", (q) => q.eq("creatorId", user._id))
+      .order("desc")
+      .take(50);
+
+    const rows: CreatedSurveyDashboardRow[] = [];
+    for (const survey of surveys) {
+      const questions = await ctx.db
+        .query("questions")
+        .withIndex("by_surveyId", (q) => q.eq("surveyId", survey._id))
+        .take(100);
+
+      const responses = await ctx.db
+        .query("surveyResponses")
+        .withIndex("by_surveyId", (q) => q.eq("surveyId", survey._id))
+        .order("desc")
+        .take(RESPONSE_COUNT_LIMIT + 1);
+      const countedResponses = responses.slice(0, RESPONSE_COUNT_LIMIT);
+
+      rows.push({
+        survey,
+        questionCount: questions.length,
+        responseCount: countedResponses.length,
+        responseCountIsCapped: responses.length > RESPONSE_COUNT_LIMIT,
+        completedCount: countedResponses.filter(
+          (response) => response.status === "completed",
+        ).length,
+        inProgressCount: countedResponses.filter(
+          (response) => response.status === "in-progress",
+        ).length,
+        abandonedCount: countedResponses.filter(
+          (response) => response.status === "abandoned",
+        ).length,
+        lastResponseAtMs: countedResponses[0]?.startedAtMs ?? null,
+      });
+    }
+
+    return rows;
   },
 });

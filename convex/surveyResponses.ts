@@ -34,6 +34,17 @@ type ResponseDashboard = {
   abandonedCount: number;
 };
 
+type MyResponseDashboardRow = {
+  response: Doc<"surveyResponses">;
+  survey: Pick<
+    Doc<"surveys">,
+    "_id" | "_creationTime" | "title" | "description" | "status"
+  >;
+  creator: Pick<Doc<"users">, "_id" | "name" | "email" | "pictureUrl"> | null;
+  questionCount: number;
+  answerCount: number;
+};
+
 async function requireUser(
   ctx: MutationCtx | QueryCtx,
 ): Promise<Doc<"users">> {
@@ -188,6 +199,67 @@ export const getMyResponse = query({
         q.eq("surveyId", args.surveyId).eq("respondentId", user._id),
       )
       .unique();
+  },
+});
+
+export const listMineWithSurveys = query({
+  args: {},
+  handler: async (ctx): Promise<MyResponseDashboardRow[]> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const responses = await ctx.db
+      .query("surveyResponses")
+      .withIndex("by_respondentId", (q) => q.eq("respondentId", user._id))
+      .order("desc")
+      .take(100);
+
+    const rows: MyResponseDashboardRow[] = [];
+    for (const response of responses) {
+      const survey = await ctx.db.get(response.surveyId);
+      if (!survey) continue;
+
+      const creatorDoc = await ctx.db.get(survey.creatorId);
+      const questions = await ctx.db
+        .query("questions")
+        .withIndex("by_surveyId", (q) => q.eq("surveyId", survey._id))
+        .take(100);
+      const answers = await ctx.db
+        .query("questionResponses")
+        .withIndex("by_surveyResponseId", (q) =>
+          q.eq("surveyResponseId", response._id),
+        )
+        .take(100);
+
+      rows.push({
+        response,
+        survey: {
+          _id: survey._id,
+          _creationTime: survey._creationTime,
+          title: survey.title,
+          description: survey.description,
+          status: survey.status,
+        },
+        creator: creatorDoc
+          ? {
+              _id: creatorDoc._id,
+              name: creatorDoc.name,
+              email: creatorDoc.email,
+              pictureUrl: creatorDoc.pictureUrl,
+            }
+          : null,
+        questionCount: questions.length,
+        answerCount: answers.length,
+      });
+    }
+
+    return rows;
   },
 });
 
