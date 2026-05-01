@@ -24,11 +24,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { accessToken } = await withAuth();
+  const auth = await withAuth();
+  const { accessToken, ...initialAuth } = auth;
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ConvexClientProvider expectAuth={!!accessToken}>{children}</ConvexClientProvider>
+        <ConvexClientProvider expectAuth={!!accessToken} initialAuth={initialAuth}>
+          {children}
+        </ConvexClientProvider>
       </body>
     </html>
   );
