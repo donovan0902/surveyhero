@@ -11,6 +11,7 @@ import type { Callbacks, Conversation } from '@elevenlabs/client';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { toast } from 'sonner';
 import { RespondHeader } from './RespondHeader';
 import { ConversationTranscript } from './ConversationTranscript';
 import { VoiceControlPanel } from './VoiceControlPanel';
@@ -99,8 +100,15 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
         },
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to start voice survey');
-      setStatus('error');
+      const msg = error instanceof Error ? error.message : '';
+      if (msg.includes('already completed')) {
+        toast.error("You've already responded to this survey", {
+          description: 'Each survey can only be completed once per person.',
+        });
+      } else {
+        setErrorMessage(msg || 'Failed to start voice survey');
+        setStatus('error');
+      }
     }
   }
 
