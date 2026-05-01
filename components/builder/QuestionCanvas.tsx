@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Mic, Info } from "lucide-react";
-import { QuestionTypeSelector } from "./QuestionTypeSelector";
-import { EmptyCanvas } from "./EmptyCanvas";
-import type { Question } from "./BuilderShell";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useDebouncedCallback } from "@/lib/useDebouncedCallback";
+import { useState } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Mic, Info } from 'lucide-react';
+import { QuestionTypeSelector } from './QuestionTypeSelector';
+import { EmptyCanvas } from './EmptyCanvas';
+import type { Question } from './BuilderShell';
+import type { Id } from '@/convex/_generated/dataModel';
+import { useDebouncedCallback } from '@/lib/useDebouncedCallback';
 
 interface QuestionCanvasProps {
   question: Question | null;
-  onUpdate: (id: Id<"questions">, patch: Partial<Question>) => void;
+  onUpdate: (id: Id<'questions'>, patch: Partial<Question>) => void;
 }
 
 export function QuestionCanvas({ question, onUpdate }: QuestionCanvasProps) {
@@ -28,11 +28,11 @@ function QuestionCanvasInner({
   onUpdate,
 }: {
   question: Question;
-  onUpdate: (id: Id<"questions">, patch: Partial<Question>) => void;
+  onUpdate: (id: Id<'questions'>, patch: Partial<Question>) => void;
 }) {
   const [prompt, setPrompt] = useState(question.prompt);
-  const [description, setDescription] = useState(question.description ?? "");
-  const [options, setOptions] = useState<string[]>(question.options ?? [""]);
+  const [description, setDescription] = useState(question.description ?? '');
+  const [options, setOptions] = useState<string[]>(question.options ?? ['']);
 
   const debouncedSavePrompt = useDebouncedCallback((value: string) => {
     onUpdate(question._id, { prompt: value });
@@ -55,23 +55,17 @@ function QuestionCanvasInner({
               </Badge>
               <span className="text-xs text-muted-foreground">Voice prompt</span>
             </div>
-            <QuestionTypeSelector
-              value={question.type}
-              onChange={(type) => onUpdate(question._id, { type })}
-            />
+            <QuestionTypeSelector value={question.type} onChange={(type) => onUpdate(question._id, { type })} />
           </div>
 
           <Card className="mb-4 border-border shadow-sm">
             <CardHeader className="pb-2 pt-4 px-5">
               <div className="flex items-center gap-2">
                 <Mic className="size-4 text-primary" />
-                <CardTitle className="text-sm font-semibold">
-                  Agent prompt
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold">Agent prompt</CardTitle>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                This is the exact script the voice agent will speak aloud to the
-                respondent.
+                This is the exact script the voice agent will speak aloud to the respondent.
               </p>
             </CardHeader>
             <CardContent className="px-5 pb-5">
@@ -82,7 +76,7 @@ function QuestionCanvasInner({
                   debouncedSavePrompt(e.target.value);
                 }}
                 placeholder='e.g. "On a scale of 1 to 10, how satisfied were you with your experience today?"'
-                className="min-h-[120px] resize-y text-sm leading-relaxed"
+                className="min-h-30 resize-y text-sm leading-relaxed"
               />
             </CardContent>
           </Card>
@@ -91,16 +85,13 @@ function QuestionCanvasInner({
             <CardHeader className="pb-2 pt-4 px-5">
               <div className="flex items-center gap-2">
                 <Info className="size-4 text-muted-foreground" />
-                <CardTitle className="text-sm font-semibold">
-                  Agent guidance
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold">Agent guidance</CardTitle>
                 <Badge variant="secondary" className="text-[10px]">
                   Optional
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Private notes for the agent — context, edge cases, what counts
-                as a complete answer.
+                Private notes for the agent — context, edge cases, what counts as a complete answer.
               </p>
             </CardHeader>
             <CardContent className="px-5 pb-5">
@@ -111,17 +102,15 @@ function QuestionCanvasInner({
                   debouncedSaveDescription(e.target.value);
                 }}
                 placeholder='e.g. "Accept any number. If they hesitate, remind them there are no wrong answers."'
-                className="min-h-[80px] resize-y text-sm text-muted-foreground"
+                className="min-h-20 resize-y text-sm text-muted-foreground"
               />
             </CardContent>
           </Card>
 
-          {question.type === "closed" && (
+          {question.type === 'closed' && (
             <Card className="border-border shadow-sm">
               <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-sm font-semibold">
-                  Answer options
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold">Answer options</CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   List the specific answers the agent should accept.
                 </p>
@@ -130,9 +119,7 @@ function QuestionCanvasInner({
                 <div className="flex flex-col gap-2">
                   {options.map((opt, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-muted-foreground w-4">
-                        {i + 1}.
-                      </span>
+                      <span className="text-xs font-mono text-muted-foreground w-4">{i + 1}.</span>
                       <Input
                         value={opt}
                         onChange={(e) => {
@@ -149,7 +136,7 @@ function QuestionCanvasInner({
                   <button
                     type="button"
                     onClick={() => {
-                      const next = [...options, ""];
+                      const next = [...options, ''];
                       setOptions(next);
                       onUpdate(question._id, { options: next });
                     }}

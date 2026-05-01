@@ -3,6 +3,22 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
+type ResponseDashboardRow = {
+  response: Doc<"surveyResponses">;
+  respondent: Pick<Doc<"users">, "_id" | "name" | "email" | "pictureUrl"> | null;
+  answersByQuestionId: Record<Id<"questions">, Doc<"questionResponses">>;
+};
+
+type ResponseDashboard = {
+  survey: Doc<"surveys">;
+  questions: Doc<"questions">[];
+  responses: ResponseDashboardRow[];
+  latestResponseCount: number;
+  completedCount: number;
+  inProgressCount: number;
+  abandonedCount: number;
+};
+
 async function requireUser(
   ctx: MutationCtx | QueryCtx,
 ): Promise<Doc<"users">> {
@@ -181,6 +197,88 @@ export const listForSurvey = query({
       .withIndex("by_surveyId", (q) => q.eq("surveyId", args.surveyId))
       .order("desc")
       .take(100);
+  },
+});
+
+export const getSurveyResponseDashboard = query({
+  args: { surveyId: v.id("surveys") },
+  handler: async (ctx, args): Promise<ResponseDashboard | null> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_authId", (q) => q.eq("authId", identity.subject))
+      .unique();
+    if (!user) return null;
+
+    const survey = await ctx.db.get(args.surveyId);
+    if (!survey || survey.creatorId !== user._id) {
+      return null;
+    }
+
+    const questions = await ctx.db
+      .query("questions")
+      .withIndex("by_surveyId_and_order", (q) =>
+        q.eq("surveyId", args.surveyId),
+      )
+      .order("asc")
+      .take(100);
+
+    const responses = await ctx.db
+      .query("surveyResponses")
+      .withIndex("by_surveyId", (q) => q.eq("surveyId", args.surveyId))
+      .order("desc")
+      .take(100);
+
+    const rows: ResponseDashboardRow[] = [];
+    for (const response of responses) {
+      const answerDocs = await ctx.db
+        .query("questionResponses")
+        .withIndex("by_surveyResponseId", (q) =>
+          q.eq("surveyResponseId", response._id),
+        )
+        .take(100);
+
+      const respondentDoc = response.respondentId
+        ? await ctx.db.get(response.respondentId)
+        : null;
+
+      const answersByQuestionId: Record<
+        Id<"questions">,
+        Doc<"questionResponses">
+      > = {};
+      for (const answer of answerDocs) {
+        answersByQuestionId[answer.questionId] = answer;
+      }
+
+      rows.push({
+        response,
+        respondent: respondentDoc
+          ? {
+              _id: respondentDoc._id,
+              name: respondentDoc.name,
+              email: respondentDoc.email,
+              pictureUrl: respondentDoc.pictureUrl,
+            }
+          : null,
+        answersByQuestionId,
+      });
+    }
+
+    return {
+      survey,
+      questions,
+      responses: rows,
+      latestResponseCount: rows.length,
+      completedCount: rows.filter((row) => row.response.status === "completed")
+        .length,
+      inProgressCount: rows.filter(
+        (row) => row.response.status === "in-progress",
+      ).length,
+      abandonedCount: rows.filter((row) => row.response.status === "abandoned")
+        .length,
+    };
   },
 });
 

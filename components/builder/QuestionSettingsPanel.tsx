@@ -13,11 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Question } from "./BuilderShell";
-import type { Id } from "@/convex/_generated/dataModel";
 
 interface QuestionSettingsPanelProps {
   question: Question | null;
-  onUpdate: (id: string, patch: Partial<Question>) => void;
+  onUpdate: (id: Question["_id"], patch: Partial<Question>) => void;
 }
 
 export function QuestionSettingsPanel({

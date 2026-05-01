@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, FilePlus, Mic, Send, Loader2 } from "lucide-react";
+import { Eye, FilePlus, Inbox, Mic, Send, Loader2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ export function BuilderTopBar({
         </span>
       </div>
 
-      <Separator orientation="vertical" className="h-5" />
+      <Separator orientation="vertical" className="mx-1" />
 
       <Input
         value={titleDraft}
@@ -87,7 +87,7 @@ export function BuilderTopBar({
           setTitleDraft(e.target.value);
           debouncedSaveTitle(e.target.value);
         }}
-        className="h-8 w-64 border-transparent bg-transparent text-sm font-medium shadow-none hover:border-border focus:border-border focus-visible:ring-0"
+        className="h-8 w-64 border-border bg-transparent text-sm font-medium shadow-none hover:border-ring/60 hover:bg-muted/30 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
         placeholder="Survey title..."
       />
 
@@ -138,6 +138,13 @@ export function BuilderTopBar({
         </Button>
       )}
 
+      <Link href={`/surveys/${survey._id}/responses`}>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Inbox className="size-3.5" />
+          Responses
+        </Button>
+      </Link>
+
       <Button
         size="sm"
         variant={isPublished ? "outline" : "default"}
@@ -164,7 +171,7 @@ export function BuilderTopBar({
             : "Publish"}
       </Button>
 
-      <Separator orientation="vertical" className="h-5" />
+      <Separator orientation="vertical" className="mx-1" />
       <AuthStatus />
 
       {publishError && (
