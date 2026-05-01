@@ -85,4 +85,55 @@ export default defineSchema({
       "questionId",
     ])
     .index("by_surveyId", ["surveyId"]),
+
+  // One record per (questionResponse × extracted theme) — only populated for
+  // open-ended questions via convex/aggregations.ts. themeKey is the canonical
+  // grouping key (synonyms collapse to the same key after canonicalization);
+  // themeLabel preserves the raw phrasing the LLM produced for this response.
+  responseThemes: defineTable({
+    questionResponseId: v.id("questionResponses"),
+    questionId: v.id("questions"),
+    surveyId: v.id("surveys"),
+    themeKey: v.string(),
+    themeLabel: v.string(),
+    evidenceQuote: v.string(),
+  })
+    .index("by_questionId", ["questionId"])
+    .index("by_questionResponseId", ["questionResponseId"])
+    .index("by_questionId_and_themeKey", ["questionId", "themeKey"]),
+
+  // One row per (question × themeKey). Maintained incrementally in
+  // upsertResponseThemes and applyCanonicalization so counts are always current
+  // without scanning responseThemes rows. Enables O(1) count reads and
+  // cheap cross-question analytics via by_surveyId.
+  themeCounters: defineTable({
+    questionId: v.id("questions"),
+    surveyId: v.id("surveys"),
+    themeKey: v.string(),
+    themeLabel: v.string(),
+    count: v.number(),
+  })
+    .index("by_questionId", ["questionId"])
+    .index("by_questionId_and_themeKey", ["questionId", "themeKey"])
+    .index("by_surveyId", ["surveyId"]),
+
+  // One row per question; holds the LLM-built narrative + theme distribution.
+  // Refreshed via stale-while-revalidate from convex/aggregations.ts.
+  questionAggregates: defineTable({
+    questionId: v.id("questions"),
+    surveyId: v.id("surveys"),
+    rootSummary: v.optional(v.string()),
+    themeDistribution: v.array(
+      v.object({
+        themeKey: v.string(),
+        label: v.string(),
+        count: v.number(),
+        sampleQuotes: v.array(v.string()),
+      }),
+    ),
+    lastBuiltAtMs: v.optional(v.number()),
+    dirty: v.boolean(),
+    responseCountAtBuild: v.number(),
+    version: v.number(),
+  }).index("by_questionId", ["questionId"]),
 });

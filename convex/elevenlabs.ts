@@ -197,32 +197,41 @@ async function ingestPostCallWebhook(
     questions.map((question) => [getDataCollectionId(question), question._id]),
   );
 
+  const questionsById = new Map(questions.map((question) => [question._id, question]));
+
   for (const result of args.dataCollectionResults) {
     const questionId = questionsByDataCollectionId.get(result.dataCollectionId);
     if (!questionId || result.value === null) continue;
 
-    await ctx.db
+    const existing = await ctx.db
       .query('questionResponses')
       .withIndex('by_surveyResponseId_and_questionId', (q) =>
         q.eq('surveyResponseId', surveyResponse._id).eq('questionId', questionId),
       )
-      .unique()
-      .then(async (existing) => {
-        const fields = {
-          surveyResponseId: surveyResponse._id,
-          questionId,
-          surveyId: surveyResponse.surveyId,
-          ...(surveyResponse.respondentId ? { respondentId: surveyResponse.respondentId } : {}),
-          response: String(result.value),
-          dataCollectionId: result.dataCollectionId,
-        };
+      .unique();
 
-        if (existing) {
-          await ctx.db.patch(existing._id, fields);
-        } else {
-          await ctx.db.insert('questionResponses', fields);
-        }
+    const fields = {
+      surveyResponseId: surveyResponse._id,
+      questionId,
+      surveyId: surveyResponse.surveyId,
+      ...(surveyResponse.respondentId ? { respondentId: surveyResponse.respondentId } : {}),
+      response: String(result.value),
+      dataCollectionId: result.dataCollectionId,
+    };
+
+    let questionResponseId: Id<'questionResponses'>;
+    if (existing) {
+      await ctx.db.patch(existing._id, fields);
+      questionResponseId = existing._id;
+    } else {
+      questionResponseId = await ctx.db.insert('questionResponses', fields);
+    }
+
+    if (questionsById.get(questionId)?.type === 'open-ended') {
+      await ctx.scheduler.runAfter(0, internal.aggregations.extractThemesForResponse, {
+        questionResponseId,
       });
+    }
   }
 
   await ctx.db.patch(surveyResponse._id, {

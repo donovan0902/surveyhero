@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as aggregations from "../aggregations.js";
 import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
 import type * as elevenlabs from "../elevenlabs.js";
 import type * as http from "../http.js";
 import type * as questions from "../questions.js";
@@ -23,7 +25,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aggregations: typeof aggregations;
   auth: typeof auth;
+  crons: typeof crons;
   elevenlabs: typeof elevenlabs;
   http: typeof http;
   questions: typeof questions;

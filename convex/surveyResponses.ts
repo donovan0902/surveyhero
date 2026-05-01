@@ -1,7 +1,22 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+
+async function maybeScheduleThemeExtraction(
+  ctx: MutationCtx,
+  questionId: Id<"questions">,
+  questionResponseId: Id<"questionResponses">,
+): Promise<void> {
+  const question = await ctx.db.get(questionId);
+  if (!question || question.type !== "open-ended") return;
+  await ctx.scheduler.runAfter(
+    0,
+    internal.aggregations.extractThemesForResponse,
+    { questionResponseId },
+  );
+}
 
 type ResponseDashboardRow = {
   response: Doc<"surveyResponses">;
@@ -87,7 +102,7 @@ export const recordAnswer = mutation({
       throw new Error("Response not found or access denied");
     }
 
-    return ctx.db.insert("questionResponses", {
+    const questionResponseId = await ctx.db.insert("questionResponses", {
       surveyResponseId: args.responseId,
       questionId: args.questionId,
       surveyId: surveyResponse.surveyId,
@@ -95,6 +110,8 @@ export const recordAnswer = mutation({
       response: args.response,
       dataCollectionId: args.dataCollectionId,
     });
+    await maybeScheduleThemeExtraction(ctx, args.questionId, questionResponseId);
+    return questionResponseId;
   },
 });
 
@@ -342,11 +359,18 @@ export const upsertExtractedAnswer = internalMutation({
       dataCollectionId: args.dataCollectionId,
     };
 
+    let questionResponseId: Id<"questionResponses">;
     if (existing) {
       await ctx.db.patch(existing._id, fields);
-      return existing._id;
+      questionResponseId = existing._id;
+    } else {
+      questionResponseId = await ctx.db.insert("questionResponses", fields);
     }
-
-    return ctx.db.insert("questionResponses", fields);
+    await maybeScheduleThemeExtraction(
+      ctx,
+      args.questionId,
+      questionResponseId,
+    );
+    return questionResponseId;
   },
 });

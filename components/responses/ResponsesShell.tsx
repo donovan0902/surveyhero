@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -10,9 +10,11 @@ import {
   Inbox,
   MessageSquareText,
   Radio,
+  RefreshCw,
+  Sparkles,
   XCircle,
 } from "lucide-react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -133,6 +135,7 @@ export function ResponsesShell({ surveyId: rawId }: ResponsesShellProps) {
           <ScrollArea className="flex-1">
             <div className="mx-auto flex max-w-6xl flex-col gap-5 px-6 py-6">
               <DashboardSummary dashboard={dashboard} />
+              <QuestionInsightsSection dashboard={dashboard} />
               <ResponsesTable
                 dashboard={dashboard}
                 selectedId={selectedResponse?.response._id ?? null}
@@ -503,4 +506,286 @@ function formatDate(value: number) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatRelative(ms: number): string {
+  const delta = Date.now() - ms;
+  if (delta < 60_000) return "just now";
+  const minutes = Math.floor(delta / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function QuestionInsightsSection({ dashboard }: { dashboard: Dashboard }) {
+  if (dashboard.questions.length === 0) return null;
+  return (
+    <Card className="border-border shadow-sm">
+      <CardHeader className="border-b px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" />
+          <CardTitle className="text-sm font-semibold">
+            Question insights
+          </CardTitle>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Aggregated across all {dashboard.latestResponseCount} responses.
+          Open-ended questions use AI-extracted themes; structured questions
+          show counts.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col divide-y divide-border p-0">
+        {dashboard.questions.map((question) => (
+          <QuestionInsight key={question._id} question={question} />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuestionInsight({ question }: { question: Doc<"questions"> }) {
+  const aggregate = useQuery(api.aggregations.getQuestionAggregate, {
+    questionId: question._id,
+  });
+  const stats = useQuery(api.aggregations.getDeterministicStats, {
+    questionId: question._id,
+  });
+  const requestRefresh = useMutation(api.aggregations.requestRefresh);
+
+  // SWR: on mount and when the question id changes, ask the server to
+  // rebuild the narrative if it's dirty or stale. The server short-circuits
+  // when nothing needs doing.
+  useEffect(() => {
+    if (question.type !== "open-ended") return;
+    requestRefresh({ questionId: question._id }).catch(() => {});
+  }, [question._id, question.type, requestRefresh]);
+
+  return (
+    <div className="flex flex-col gap-3 px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">
+            {question.prompt || `Question ${question.order}`}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground capitalize">
+            {question.type.replace("-", " ")} question
+          </p>
+        </div>
+        <Badge variant="outline" className="font-mono text-xs">
+          Q{question.order}
+        </Badge>
+      </div>
+      {question.type === "open-ended" ? (
+        <OpenEndedInsight
+          questionId={question._id}
+          aggregate={aggregate}
+          onRefresh={() => requestRefresh({ questionId: question._id })}
+        />
+      ) : (
+        <DeterministicInsight stats={stats} />
+      )}
+    </div>
+  );
+}
+
+type AggregateResult = FunctionReturnType<
+  typeof api.aggregations.getQuestionAggregate
+>;
+
+function OpenEndedInsight({
+  aggregate,
+  onRefresh,
+}: {
+  questionId: Id<"questions">;
+  aggregate: AggregateResult | undefined;
+  onRefresh: () => void;
+}) {
+  if (aggregate === undefined) {
+    return <Skeleton className="h-16 w-full" />;
+  }
+  if (!aggregate || !aggregate.aggregate) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No responses yet — themes will appear once respondents answer.
+      </p>
+    );
+  }
+  const { rootSummary, themeDistribution, lastBuiltAtMs, dirty } =
+    aggregate.aggregate;
+  const total = themeDistribution.reduce((sum, t) => sum + t.count, 0);
+
+  if (themeDistribution.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No responses yet — themes will appear once respondents answer.
+      </p>
+    );
+  }
+
+  const top = themeDistribution.slice(0, 8);
+  const max = top[0]?.count ?? 1;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {rootSummary ? (
+        <p className="text-sm leading-relaxed">{rootSummary}</p>
+      ) : null}
+      <div className="flex flex-col gap-1.5">
+        {top.map((theme) => (
+          <ThemeBar
+            key={theme.themeKey}
+            label={theme.label}
+            count={theme.count}
+            total={total}
+            widthPercent={(theme.count / max) * 100}
+            sampleQuote={theme.sampleQuotes[0]}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {lastBuiltAtMs
+            ? `Updated ${formatRelative(lastBuiltAtMs)}`
+            : "Building summary…"}
+          {dirty ? " · refreshing" : ""}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 gap-1 px-2 text-xs"
+          onClick={onRefresh}
+        >
+          <RefreshCw className="size-3" />
+          Refresh
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ThemeBar({
+  label,
+  count,
+  total,
+  widthPercent,
+  sampleQuote,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  widthPercent: number;
+  sampleQuote?: string;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <div className="w-44 shrink-0 truncate text-sm" title={label}>
+          {label}
+        </div>
+        <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary/80"
+            style={{ width: `${widthPercent}%` }}
+          />
+        </div>
+        <div className="w-16 shrink-0 text-right font-mono text-xs text-muted-foreground">
+          {count} · {pct}%
+        </div>
+      </div>
+      {sampleQuote ? (
+        <p className="ml-44 truncate pl-2 text-xs italic text-muted-foreground">
+          “{sampleQuote}”
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type StatsResult = FunctionReturnType<
+  typeof api.aggregations.getDeterministicStats
+>;
+
+function DeterministicInsight({ stats }: { stats: StatsResult | undefined }) {
+  if (stats === undefined) return <Skeleton className="h-12 w-full" />;
+  if (!stats || stats.kind === "open-ended") return null;
+
+  if (stats.kind === "rating") {
+    if (stats.count === 0) {
+      return (
+        <p className="text-xs text-muted-foreground">No ratings yet.</p>
+      );
+    }
+    const max = Math.max(...stats.distribution.map((d) => d.count), 1);
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-sm">
+          Average:{" "}
+          <span className="font-semibold">
+            {stats.average !== null ? stats.average.toFixed(2) : "—"}
+          </span>{" "}
+          <span className="text-xs text-muted-foreground">
+            ({stats.count} response{stats.count === 1 ? "" : "s"})
+          </span>
+        </p>
+        <div className="flex flex-col gap-1">
+          {stats.distribution.map((d) => (
+            <ThemeBar
+              key={d.value}
+              label={String(d.value)}
+              count={d.count}
+              total={stats.count}
+              widthPercent={(d.count / max) * 100}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (stats.kind === "yes-no") {
+    const total = stats.yes + stats.no;
+    if (total === 0) {
+      return <p className="text-xs text-muted-foreground">No answers yet.</p>;
+    }
+    const max = Math.max(stats.yes, stats.no, 1);
+    return (
+      <div className="flex flex-col gap-1">
+        <ThemeBar
+          label="Yes"
+          count={stats.yes}
+          total={total}
+          widthPercent={(stats.yes / max) * 100}
+        />
+        <ThemeBar
+          label="No"
+          count={stats.no}
+          total={total}
+          widthPercent={(stats.no / max) * 100}
+        />
+      </div>
+    );
+  }
+
+  // closed
+  const total = stats.counts.reduce((sum, c) => sum + c.count, 0);
+  if (total === 0) {
+    return <p className="text-xs text-muted-foreground">No answers yet.</p>;
+  }
+  const max = stats.counts[0]?.count ?? 1;
+  return (
+    <div className="flex flex-col gap-1">
+      {stats.counts.map((c) => (
+        <ThemeBar
+          key={c.option}
+          label={c.option}
+          count={c.count}
+          total={total}
+          widthPercent={(c.count / max) * 100}
+        />
+      ))}
+    </div>
+  );
 }
