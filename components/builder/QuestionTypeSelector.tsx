@@ -1,12 +1,14 @@
 "use client";
 
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 import type { QuestionType } from "./BuilderShell";
 
 const options: {
@@ -45,23 +47,41 @@ export function QuestionTypeSelector({
   value,
   onChange,
 }: QuestionTypeSelectorProps) {
+  const selectedOption = options.find((option) => option.value === value);
+
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as QuestionType)}>
-      <SelectTrigger className="h-7 w-36 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value} className="text-xs">
-            <div>
-              <div className="font-medium">{opt.label}</div>
-              <div className="text-muted-foreground text-[10px]">
-                {opt.description}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-36 justify-between px-2 text-xs font-normal"
+        >
+          <span className="truncate">{selectedOption?.label ?? "Select type"}</span>
+          <ChevronDown className="size-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(nextValue) => onChange(nextValue as QuestionType)}
+        >
+          {options.map((opt) => (
+            <DropdownMenuRadioItem
+              key={opt.value}
+              value={opt.value}
+              className="items-start gap-2 py-2 text-xs"
+            >
+              <div className="pr-4">
+                <div className="font-medium">{opt.label}</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {opt.description}
+                </div>
               </div>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

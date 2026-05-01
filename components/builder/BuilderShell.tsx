@@ -1,25 +1,25 @@
-"use client";
+'use client';
 
-import { useCallback, useState } from "react";
-import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { BuilderTopBar } from "./BuilderTopBar";
-import { QuestionSidebar } from "./QuestionSidebar";
-import { QuestionCanvas } from "./QuestionCanvas";
-import { QuestionSettingsPanel } from "./QuestionSettingsPanel";
+import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import type { Doc, Id } from '@/convex/_generated/dataModel';
+import { BuilderTopBar } from './BuilderTopBar';
+import { QuestionSidebar } from './QuestionSidebar';
+import { QuestionCanvas } from './QuestionCanvas';
+import { QuestionSettingsPanel } from './QuestionSettingsPanel';
 
-export type QuestionType = Doc<"questions">["type"];
-export type Question = Doc<"questions">;
-export type SaveStatus = "saving" | "saved";
+export type QuestionType = Doc<'questions'>['type'];
+export type Question = Doc<'questions'>;
+export type SaveStatus = 'saving' | 'saved';
 
 interface BuilderShellProps {
   surveyId: string;
 }
 
 export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
-  const surveyId = rawId as Id<"surveys">;
+  const surveyId = rawId as Id<'surveys'>;
 
   const survey = useQuery(api.surveys.get, { surveyId });
   const questions = useQuery(api.questions.listForSurvey, { surveyId });
@@ -31,7 +31,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
   const removeQuestion = useMutation(api.questions.remove);
   const reorderQuestionsMutation = useMutation(api.questions.reorder);
 
-  const [selectedId, setSelectedId] = useState<Id<"questions"> | null>(null);
+  const [selectedId, setSelectedId] = useState<Id<'questions'> | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
   const track = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
@@ -39,8 +39,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
     return promise.finally(() => setPendingCount((n) => n - 1));
   }, []);
 
-  const selectedQuestion =
-    questions?.find((q) => q._id === selectedId) ?? null;
+  const selectedQuestion = questions?.find((q) => q._id === selectedId) ?? null;
 
   const handleTitleChange = useCallback(
     (title: string) => {
@@ -50,7 +49,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
   );
 
   const handleStatusChange = useCallback(
-    async (status: Doc<"surveys">["status"]) => {
+    async (status: Doc<'surveys'>['status']) => {
       await track(updateStatus({ surveyId, status }));
     },
     [surveyId, updateStatus, track],
@@ -60,15 +59,15 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
     const newId = await track(
       createQuestion({
         surveyId,
-        prompt: "",
-        type: "open-ended",
+        prompt: '',
+        type: 'open-ended',
       }),
     );
     setSelectedId(newId);
   }, [surveyId, createQuestion, track]);
 
   const updateQuestion = useCallback(
-    (id: Id<"questions">, patch: Partial<Doc<"questions">>) => {
+    (id: Id<'questions'>, patch: Partial<Doc<'questions'>>) => {
       void track(
         updateQuestionMutation({
           questionId: id,
@@ -85,7 +84,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
   );
 
   const deleteQuestion = useCallback(
-    (id: Id<"questions">) => {
+    (id: Id<'questions'>) => {
       if (selectedId === id) {
         const idx = questions?.findIndex((q) => q._id === id) ?? -1;
         const fallback = questions?.[idx + 1] ?? questions?.[idx - 1] ?? null;
@@ -124,9 +123,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background text-center">
         <p className="text-sm font-medium">Survey not found</p>
-        <p className="text-xs text-muted-foreground">
-          It may have been deleted, or you may not have access.
-        </p>
+        <p className="text-xs text-muted-foreground">It may have been deleted, or you may not have access.</p>
         <Link href="/" className="mt-2 text-xs text-primary underline">
           Back to home
         </Link>
@@ -139,7 +136,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
       <BuilderTopBar
         survey={survey}
         questionCount={questions.length}
-        saveStatus={pendingCount > 0 ? "saving" : "saved"}
+        saveStatus={pendingCount > 0 ? 'saving' : 'saved'}
         onTitleChange={handleTitleChange}
         onStatusChange={handleStatusChange}
       />
@@ -153,10 +150,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
           onReorder={reorderQuestions}
         />
         <QuestionCanvas question={selectedQuestion} onUpdate={updateQuestion} />
-        <QuestionSettingsPanel
-          question={selectedQuestion}
-          onUpdate={updateQuestion}
-        />
+        <QuestionSettingsPanel question={selectedQuestion} onUpdate={updateQuestion} />
       </div>
     </div>
   );
