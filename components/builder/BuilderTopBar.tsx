@@ -9,6 +9,7 @@ import {
   FilePlus,
   Inbox,
   LayoutDashboard,
+  Link2,
   Mic,
   Send,
   Loader2,
@@ -44,6 +45,7 @@ export function BuilderTopBar({
   const syncAgent = useAction(api.elevenlabs.syncAgentForSurvey);
 
   const [titleDraft, setTitleDraft] = useState(survey.title);
+  const [copied, setCopied] = useState(false);
   const [publishState, setPublishState] = useState<"idle" | "busy">("idle");
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -76,6 +78,13 @@ export function BuilderTopBar({
   async function handleNewSurvey() {
     const newId = await createSurvey({ title: "Untitled survey" });
     router.push(`/surveys/${newId}/edit`);
+  }
+
+  async function handleShare() {
+    const url = `${window.location.origin}/surveys/${survey._id}/respond`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
   }
 
   return (
@@ -152,6 +161,19 @@ export function BuilderTopBar({
           Preview
         </Button>
       )}
+
+      {isPublished ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleShare}
+          title="Copy response link"
+          className="gap-1.5"
+        >
+          <Link2 className="size-3.5" />
+          {copied ? "Copied" : "Share"}
+        </Button>
+      ) : null}
 
       <Link href={`/surveys/${survey._id}/responses`}>
         <Button variant="outline" size="sm" className="gap-1.5">

@@ -35,7 +35,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
   const [selectedId, setSelectedId] = useState<Id<'questions'> | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const track = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
+  const track = useCallback(async <T,>(promise: Promise<T>): Promise<T> => {
     setPendingCount((n) => n + 1);
     return promise.finally(() => setPendingCount((n) => n - 1));
   }, []);
