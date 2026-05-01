@@ -325,11 +325,23 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
         prompt: {
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
-          temperature: 0.2,
+          temperature: 0.5,
+          built_in_tools: {
+            end_call: {
+              name: 'end_call',
+              description: '',
+              response_timeout_secs: 20,
+              type: 'system',
+              params: {
+                system_tool_type: 'end_call',
+              },
+            },
+          },
         },
       },
       tts: {
         voice_id: process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID,
+        model_id: 'eleven_v3_conversational',
       },
     },
     platform_settings: {
