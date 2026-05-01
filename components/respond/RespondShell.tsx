@@ -102,6 +102,7 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
       });
     } catch (error) {
       if (error instanceof ConvexError && typeof error.data === 'string' && error.data.includes('already completed')) {
+        setStatus('idle');
         toast.error("You've already responded to this survey", {
           description: 'Each survey can only be completed once per person.',
         });

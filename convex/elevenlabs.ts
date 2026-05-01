@@ -10,7 +10,7 @@ type SurveyAgentContext = {
 };
 
 const DEFAULT_LLM = 'gemini-2.5-flash';
-const DEFAULT_VOICE_ID = 'EST9Ui6982FZPSi7gCHi';
+const DEFAULT_VOICE_ID = 'XcXEQzuLXRU9RcfWzEJt';
 const MAX_DATA_COLLECTION_ITEMS = 25;
 
 const extractedValueValidator = v.union(v.string(), v.number(), v.boolean(), v.null());

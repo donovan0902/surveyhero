@@ -132,7 +132,7 @@ export function ResponsesShell({ surveyId: rawId }: ResponsesShellProps) {
       <ResponsesTopBar title={dashboard.survey.title} surveyId={surveyId} />
       <main className="flex flex-1 overflow-hidden bg-muted/30">
         <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 overflow-hidden">
             <div className="mx-auto flex max-w-6xl flex-col gap-5 px-6 py-6">
               <DashboardSummary dashboard={dashboard} />
               <QuestionInsightsSection dashboard={dashboard} />
