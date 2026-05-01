@@ -24,9 +24,9 @@ export function AuthStatus() {
         <span className="text-sm text-muted-foreground">
           {user?.firstName ?? user?.email}
         </span>
-        <Link href="/sign-out">
-          <Button variant="ghost" size="sm">Sign out</Button>
-        </Link>
+        <form action="/sign-out" method="post">
+          <Button type="submit" variant="ghost" size="sm">Sign out</Button>
+        </form>
       </Authenticated>
     </>
   );
