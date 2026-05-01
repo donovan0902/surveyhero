@@ -1,8 +1,14 @@
 "use client";
 
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 import { Plus } from "lucide-react";
 import { QuestionSidebarItem } from "./QuestionSidebarItem";
 import type { Question } from "./BuilderShell";
@@ -25,8 +31,11 @@ export function QuestionSidebar({
   onDelete,
 }: QuestionSidebarProps) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center justify-between px-4 py-3">
+    <Sidebar
+      collapsible="none"
+      className="w-72 shrink-0 border-r border-border"
+    >
+      <SidebarHeader className="flex-row items-center justify-between px-4 py-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Questions
         </span>
@@ -38,22 +47,24 @@ export function QuestionSidebar({
         >
           <Plus className="size-3.5" />
         </Button>
-      </div>
-      <Separator />
-      <ScrollArea className="flex-1 px-2 py-2">
+      </SidebarHeader>
+      <SidebarSeparator />
+      <SidebarContent>
         {questions.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <div className="rounded-full bg-muted p-3">
-              <Plus className="size-5 text-muted-foreground" />
+          <SidebarGroup className="flex flex-1 items-center justify-center px-2 py-12">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="rounded-full bg-muted p-3">
+                <Plus className="size-5 text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                No questions yet.
+                <br />
+                Click + to add one.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              No questions yet.
-              <br />
-              Click + to add one.
-            </p>
-          </div>
+          </SidebarGroup>
         ) : (
-          <div className="flex flex-col gap-1">
+          <SidebarGroup className="gap-1 px-2 py-2">
             {questions.map((q, index) => (
               <QuestionSidebarItem
                 key={q._id}
@@ -64,11 +75,11 @@ export function QuestionSidebar({
                 onDelete={() => onDelete(q._id)}
               />
             ))}
-          </div>
+          </SidebarGroup>
         )}
-      </ScrollArea>
-      <Separator />
-      <div className="p-3">
+      </SidebarContent>
+      <SidebarSeparator />
+      <SidebarFooter className="p-3">
         <Button
           variant="outline"
           size="sm"
@@ -78,7 +89,7 @@ export function QuestionSidebar({
           <Plus className="size-3.5" />
           Add question
         </Button>
-      </div>
-    </aside>
+      </SidebarFooter>
+    </Sidebar>
   );
 }

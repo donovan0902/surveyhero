@@ -320,7 +320,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
     tags: ['surveyhero', `survey_${survey._id}`],
     conversation_config: {
       agent: {
-        first_message: `Thanks for taking this survey: ${survey.title}. I'll ask ${questions.length} questions. Please answer naturally, and I'll guide us through.`,
+        first_message: `Thanks for taking the survey. I'll ask a few questions and keep track of your answers. First question: ${questions[0].prompt}`,
         language: 'en',
         prompt: {
           prompt: buildSurveyPrompt(survey, questions),

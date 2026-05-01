@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import type { Doc, Id } from '@/convex/_generated/dataModel';
 import { BuilderTopBar } from './BuilderTopBar';
 import { QuestionSidebar } from './QuestionSidebar';
@@ -140,7 +141,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
         onTitleChange={handleTitleChange}
         onStatusChange={handleStatusChange}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <SidebarProvider className="min-h-0 flex-1 overflow-hidden">
         <QuestionSidebar
           questions={questions}
           selectedId={selectedId}
@@ -151,7 +152,7 @@ export function BuilderShell({ surveyId: rawId }: BuilderShellProps) {
         />
         <QuestionCanvas question={selectedQuestion} onUpdate={updateQuestion} />
         <QuestionSettingsPanel question={selectedQuestion} onUpdate={updateQuestion} />
-      </div>
+      </SidebarProvider>
     </div>
   );
 }
