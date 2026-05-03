@@ -240,46 +240,36 @@ function ResponsesTable({
   onSelect: (id: Id<'surveyResponses'>) => void;
 }) {
   return (
-    <Card className="border-border shadow-sm">
-      <CardHeader className="border-b px-5 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm font-semibold">Response inbox</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">Showing the latest 100 responses for this survey.</p>
-          </div>
+    <section>
+      {dashboard.responses.length === 0 ? (
+        <EmptyResponses />
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
+              <TableRow>
+                <TableHead className="px-5">Respondent</TableHead>
+                <TableHead className="px-4">Status</TableHead>
+                <TableHead className="px-4">Answers</TableHead>
+                <TableHead className="px-4">Started</TableHead>
+                <TableHead className="px-5">Completed</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dashboard.responses.map((row) => (
+                <ResponseTableRow
+                  key={row.response._id}
+                  dashboard={dashboard}
+                  row={row}
+                  isSelected={row.response._id === selectedId}
+                  onSelect={() => onSelect(row.response._id)}
+                />
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {dashboard.responses.length === 0 ? (
-          <EmptyResponses />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
-                <TableRow>
-                  <TableHead className="px-5">Respondent</TableHead>
-                  <TableHead className="px-4">Status</TableHead>
-                  <TableHead className="px-4">Answers</TableHead>
-                  <TableHead className="px-4">Started</TableHead>
-                  <TableHead className="px-5">Completed</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dashboard.responses.map((row) => (
-                  <ResponseTableRow
-                    key={row.response._id}
-                    dashboard={dashboard}
-                    row={row}
-                    isSelected={row.response._id === selectedId}
-                    onSelect={() => onSelect(row.response._id)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 }
 
@@ -343,7 +333,7 @@ function ResponseDetail({
               <SheetTitle className="truncate">
                 {row.respondent?.name ?? row.respondent?.email ?? 'Anonymous respondent'}
               </SheetTitle>
-              <SheetDescription>Started {formatDate(row.response.startedAtMs)}</SheetDescription>
+              <SheetDescription>Completed {formatDate(row.response.startedAtMs)}</SheetDescription>
             </div>
             <StatusBadge status={row.response.status} />
           </div>
@@ -511,7 +501,7 @@ function OpenEndedInsight({
   return (
     <div className="flex flex-col gap-3">
       {rootSummary ? <p className="text-sm leading-relaxed">{rootSummary}</p> : null}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 pt-4">
         {top.map((theme) => (
           <ThemeBar
             key={theme.themeKey}
