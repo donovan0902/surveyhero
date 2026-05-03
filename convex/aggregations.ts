@@ -15,7 +15,6 @@ const EXTRACTION_MODEL = "claude-haiku-4-5";
 const NARRATIVE_MODEL = "claude-sonnet-4-6";
 const CANONICALIZATION_MODEL = "claude-haiku-4-5";
 
-const STALE_THRESHOLD_MS = 1000 * 60 * 10;
 const MAX_THEMES_PER_RESPONSE = 5;
 const MAX_QUOTES_PER_THEME_FOR_NARRATIVE = 3;
 const MAX_THEMES_FOR_NARRATIVE = 12;
@@ -730,9 +729,9 @@ export const getQuestionAggregate = query({
 });
 
 // Public mutation: stale-while-revalidate trigger. Schedules a rebuild if the
-// aggregate is dirty or older than the staleness threshold. Idempotent enough
-// for casual UI calls (multiple rapid calls just queue extra rebuilds, which
-// are cheap; the narrative regenerates from current data each time).
+// aggregate is dirty or has never been built. Idempotent enough for casual UI
+// calls (multiple rapid calls just queue extra rebuilds, which are cheap; the
+// narrative regenerates from current data each time).
 export const requestRefresh = mutation({
   args: { questionId: v.id("questions") },
   handler: async (ctx, args): Promise<{ scheduled: boolean }> => {
@@ -746,11 +745,8 @@ export const requestRefresh = mutation({
       question.surveyId,
     );
 
-    const isStale =
-      aggregate.dirty ||
-      aggregate.lastBuiltAtMs === undefined ||
-      Date.now() - aggregate.lastBuiltAtMs > STALE_THRESHOLD_MS;
-    if (!isStale) return { scheduled: false };
+    const needsRebuild = aggregate.dirty || aggregate.lastBuiltAtMs === undefined;
+    if (!needsRebuild) return { scheduled: false };
 
     await ctx.scheduler.runAfter(
       0,

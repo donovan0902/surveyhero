@@ -427,9 +427,9 @@ function QuestionInsight({ question }: { question: Doc<'questions'> }) {
   });
   const requestRefresh = useMutation(api.aggregations.requestRefresh);
 
-  // SWR: on mount and when the question id changes, ask the server to
-  // rebuild the narrative if it's dirty or stale. The server short-circuits
-  // when nothing needs doing.
+  // SWR: on mount and when the question id changes, ask the server to rebuild
+  // the narrative if it's dirty or has never been built. The server
+  // short-circuits when nothing needs doing.
   useEffect(() => {
     if (question.type !== 'open-ended') return;
     requestRefresh({ questionId: question._id }).catch(() => {});
