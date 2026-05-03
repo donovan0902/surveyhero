@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import {
   BarChart3,
   CheckCircle2,
@@ -17,51 +17,35 @@ import {
   PenLine,
   Send,
   Sparkles,
-} from "lucide-react";
+} from 'lucide-react';
 
-import { AuthStatus } from "@/components/AuthStatus";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { api } from "@/convex/_generated/api";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { cn } from "@/lib/utils";
+import { AuthStatus } from '@/components/AuthStatus';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { api } from '@/convex/_generated/api';
+import type { Doc, Id } from '@/convex/_generated/dataModel';
+import { cn } from '@/lib/utils';
 
-type CreatedSurveyRow = FunctionReturnType<
-  typeof api.surveys.listDashboard
->[number];
-type RespondedSurveyRow = FunctionReturnType<
-  typeof api.surveyResponses.listMineWithSurveys
->[number];
+type CreatedSurveyRow = FunctionReturnType<typeof api.surveys.listDashboard>[number];
+type RespondedSurveyRow = FunctionReturnType<typeof api.surveyResponses.listMineWithSurveys>[number];
 
-const surveyStatusStyles: Record<Doc<"surveys">["status"], string> = {
-  draft: "border-border bg-muted text-muted-foreground",
-  published: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  closed: "border-slate-300 bg-slate-100 text-slate-700",
+const surveyStatusStyles: Record<Doc<'surveys'>['status'], string> = {
+  draft: 'border-border bg-muted text-muted-foreground',
+  published: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  closed: 'border-slate-300 bg-slate-100 text-slate-700',
 };
 
-const responseStatusStyles: Record<Doc<"surveyResponses">["status"], string> =
-  {
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    "in-progress": "border-amber-200 bg-amber-50 text-amber-700",
-    abandoned: "border-border bg-muted text-muted-foreground",
-  };
+const responseStatusStyles: Record<Doc<'surveyResponses'>['status'], string> = {
+  'completed': 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  'in-progress': 'border-amber-200 bg-amber-50 text-amber-700',
+  'abandoned': 'border-border bg-muted text-muted-foreground',
+};
 
 export function DashboardShell() {
   const router = useRouter();
@@ -70,24 +54,16 @@ export function DashboardShell() {
   const respondedSurveys = useQuery(api.surveyResponses.listMineWithSurveys, {});
 
   const [creating, setCreating] = useState(false);
-  const [copiedSurveyId, setCopiedSurveyId] = useState<Id<"surveys"> | null>(
-    null,
-  );
+  const [copiedSurveyId, setCopiedSurveyId] = useState<Id<'surveys'> | null>(null);
 
   const stats = useMemo(() => {
     const created = createdSurveys ?? [];
     const responded = respondedSurveys ?? [];
     return {
       createdCount: created.length,
-      publishedCount: created.filter((row) => row.survey.status === "published")
-        .length,
-      responseCount: created.reduce(
-        (sum, row) => sum + row.responseCount,
-        0,
-      ),
-      completedResponses: responded.filter(
-        (row) => row.response.status === "completed",
-      ).length,
+      publishedCount: created.filter((row) => row.survey.status === 'published').length,
+      responseCount: created.reduce((sum, row) => sum + row.responseCount, 0),
+      completedResponses: responded.filter((row) => row.response.status === 'completed').length,
     };
   }, [createdSurveys, respondedSurveys]);
 
@@ -95,22 +71,21 @@ export function DashboardShell() {
     if (creating) return;
     setCreating(true);
     try {
-      const surveyId = await createSurvey({ title: "Untitled survey" });
+      const surveyId = await createSurvey({ title: 'Untitled survey' });
       router.push(`/surveys/${surveyId}/edit`);
     } finally {
       setCreating(false);
     }
   }
 
-  async function copyRespondLink(surveyId: Id<"surveys">) {
+  async function copyRespondLink(surveyId: Id<'surveys'>) {
     const url = `${window.location.origin}/surveys/${surveyId}/respond`;
     await navigator.clipboard.writeText(url);
     setCopiedSurveyId(surveyId);
     window.setTimeout(() => setCopiedSurveyId(null), 1600);
   }
 
-  const isLoading =
-    createdSurveys === undefined || respondedSurveys === undefined;
+  const isLoading = createdSurveys === undefined || respondedSurveys === undefined;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -118,20 +93,19 @@ export function DashboardShell() {
       <main className="flex flex-1 overflow-hidden bg-muted/30">
         <ScrollArea className="flex-1">
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-            <DashboardHero onCreateSurvey={handleCreateSurvey} creating={creating} />
             {isLoading ? (
               <DashboardLoading />
             ) : (
               <>
                 <SummaryGrid stats={stats} />
-                <CreatedSurveysSection
-                  rows={createdSurveys}
+                <DashboardTablesTabs
+                  createdRows={createdSurveys}
+                  respondedRows={respondedSurveys}
                   copiedSurveyId={copiedSurveyId}
                   onCreateSurvey={handleCreateSurvey}
                   onCopyRespondLink={copyRespondLink}
                   creating={creating}
                 />
-                <RespondedSurveysSection rows={respondedSurveys} />
               </>
             )}
           </div>
@@ -141,20 +115,12 @@ export function DashboardShell() {
   );
 }
 
-function DashboardTopBar({
-  onCreateSurvey,
-  creating,
-}: {
-  onCreateSurvey: () => void;
-  creating: boolean;
-}) {
+function DashboardTopBar({ onCreateSurvey, creating }: { onCreateSurvey: () => void; creating: boolean }) {
   return (
     <header className="relative z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur">
       <Link href="/" className="flex items-center gap-2 text-muted-foreground">
         <Mic className="size-4 text-primary" />
-        <span className="text-sm font-semibold tracking-tight text-foreground">
-          SurveyHero
-        </span>
+        <span className="text-sm font-semibold tracking-tight text-foreground">SurveyHero</span>
       </Link>
       <Separator orientation="vertical" className="mx-1" />
       <div className="flex min-w-0 items-center gap-2">
@@ -162,14 +128,9 @@ function DashboardTopBar({
         <span className="text-sm font-medium">Dashboard</span>
       </div>
       <div className="flex-1" />
-      <Button
-        size="sm"
-        onClick={onCreateSurvey}
-        disabled={creating}
-        className="gap-1.5"
-      >
+      <Button size="sm" onClick={onCreateSurvey} disabled={creating} className="gap-1.5">
         <FilePlus2 className="size-3.5" />
-        {creating ? "Creating..." : "New survey"}
+        {creating ? 'Creating...' : 'New survey'}
       </Button>
       <Separator orientation="vertical" className="mx-1 hidden sm:block" />
       <AuthStatus />
@@ -177,13 +138,7 @@ function DashboardTopBar({
   );
 }
 
-function DashboardHero({
-  onCreateSurvey,
-  creating,
-}: {
-  onCreateSurvey: () => void;
-  creating: boolean;
-}) {
+function DashboardHero({ onCreateSurvey, creating }: { onCreateSurvey: () => void; creating: boolean }) {
   return (
     <section className="relative overflow-hidden rounded-3xl border border-border bg-background p-6 shadow-sm sm:p-8">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_32%),linear-gradient(135deg,transparent,oklch(0.963_0.002_197.1/_0.7))]" />
@@ -197,14 +152,13 @@ function DashboardHero({
             Manage the surveys you create and the ones you answer.
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Build voice-led questionnaires, publish respondent links, and review
-            answer summaries from one place.
+            Build voice-led questionnaires, publish respondent links, and review answer summaries from one place.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button onClick={onCreateSurvey} disabled={creating} className="gap-1.5">
             <FilePlus2 className="size-4" />
-            {creating ? "Creating..." : "Create survey"}
+            {creating ? 'Creating...' : 'Create survey'}
           </Button>
           <Button asChild variant="outline" className="gap-1.5">
             <Link href="#responded">
@@ -230,21 +184,9 @@ function SummaryGrid({
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <MetricCard
-        label="Created surveys"
-        value={stats.createdCount}
-        icon={<PenLine className="size-4" />}
-      />
-      <MetricCard
-        label="Published"
-        value={stats.publishedCount}
-        icon={<Send className="size-4" />}
-      />
-      <MetricCard
-        label="Responses received"
-        value={stats.responseCount}
-        icon={<BarChart3 className="size-4" />}
-      />
+      <MetricCard label="Created surveys" value={stats.createdCount} icon={<PenLine className="size-4" />} />
+      <MetricCard label="Published" value={stats.publishedCount} icon={<Send className="size-4" />} />
+      <MetricCard label="Responses received" value={stats.responseCount} icon={<BarChart3 className="size-4" />} />
       <MetricCard
         label="Surveys completed"
         value={stats.completedResponses}
@@ -254,15 +196,7 @@ function SummaryGrid({
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number;
-  icon: ReactNode;
-}) {
+function MetricCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
   return (
     <Card className="border-border shadow-sm">
       <CardContent className="flex items-center justify-between py-2">
@@ -270,11 +204,52 @@ function MetricCard({
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
         </div>
-        <div className="rounded-full bg-muted p-2 text-muted-foreground">
-          {icon}
-        </div>
+        <div className="rounded-full bg-muted p-2 text-muted-foreground">{icon}</div>
       </CardContent>
     </Card>
+  );
+}
+
+function DashboardTablesTabs({
+  createdRows,
+  respondedRows,
+  copiedSurveyId,
+  onCreateSurvey,
+  onCopyRespondLink,
+  creating,
+}: {
+  createdRows: CreatedSurveyRow[];
+  respondedRows: RespondedSurveyRow[];
+  copiedSurveyId: Id<'surveys'> | null;
+  onCreateSurvey: () => void;
+  onCopyRespondLink: (surveyId: Id<'surveys'>) => void;
+  creating: boolean;
+}) {
+  return (
+    <Tabs defaultValue="created" className="gap-4">
+      <TabsList className="grid w-full grid-cols-2 sm:w-fit">
+        <TabsTrigger value="created" className="gap-2">
+          <PenLine className="size-3.5" />
+          Created
+        </TabsTrigger>
+        <TabsTrigger value="responded" className="gap-2">
+          <Inbox className="size-3.5" />
+          Responded
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="created" className="mt-0">
+        <CreatedSurveysSection
+          rows={createdRows}
+          copiedSurveyId={copiedSurveyId}
+          onCreateSurvey={onCreateSurvey}
+          onCopyRespondLink={onCopyRespondLink}
+          creating={creating}
+        />
+      </TabsContent>
+      <TabsContent value="responded" className="mt-0">
+        <RespondedSurveysSection rows={respondedRows} />
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -286,74 +261,50 @@ function CreatedSurveysSection({
   creating,
 }: {
   rows: CreatedSurveyRow[];
-  copiedSurveyId: Id<"surveys"> | null;
+  copiedSurveyId: Id<'surveys'> | null;
   onCreateSurvey: () => void;
-  onCopyRespondLink: (surveyId: Id<"surveys">) => void;
+  onCopyRespondLink: (surveyId: Id<'surveys'>) => void;
   creating: boolean;
 }) {
   return (
-    <Card className="border-border shadow-sm">
-      <CardHeader className="border-b px-5 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-sm font-semibold">
-              Created surveys
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Draft, publish, share, and review the surveys you own.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            onClick={onCreateSurvey}
-            disabled={creating}
-            className="gap-1.5"
-          >
-            <FilePlus2 className="size-3.5" />
-            New survey
-          </Button>
+    <section>
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={<PenLine className="size-8" />}
+          title="No surveys yet"
+          description="Create your first survey, add questions, then publish a voice response link."
+          action={
+            <Button onClick={onCreateSurvey} disabled={creating}>
+              Create survey
+            </Button>
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
+              <TableRow>
+                <TableHead className="px-5">Survey</TableHead>
+                <TableHead className="px-4">Status</TableHead>
+                <TableHead className="px-4">Questions</TableHead>
+                <TableHead className="px-4">Responses</TableHead>
+                <TableHead className="px-5 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <CreatedSurveyTableRow
+                  key={row.survey._id}
+                  row={row}
+                  copied={copiedSurveyId === row.survey._id}
+                  onCopyRespondLink={() => onCopyRespondLink(row.survey._id)}
+                />
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={<PenLine className="size-8" />}
-            title="No surveys yet"
-            description="Create your first survey, add questions, then publish a voice response link."
-            action={
-              <Button onClick={onCreateSurvey} disabled={creating}>
-                Create survey
-              </Button>
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
-                <TableRow>
-                  <TableHead className="px-5">Survey</TableHead>
-                  <TableHead className="px-4">Status</TableHead>
-                  <TableHead className="px-4">Questions</TableHead>
-                  <TableHead className="px-4">Responses</TableHead>
-                  <TableHead className="px-4">Last response</TableHead>
-                  <TableHead className="px-5 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <CreatedSurveyTableRow
-                    key={row.survey._id}
-                    row={row}
-                    copied={copiedSurveyId === row.survey._id}
-                    onCopyRespondLink={() => onCopyRespondLink(row.survey._id)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 }
 
@@ -366,17 +317,14 @@ function CreatedSurveyTableRow({
   copied: boolean;
   onCopyRespondLink: () => void;
 }) {
-  const canShare = row.survey.status === "published";
+  const canShare = row.survey.status === 'published';
 
   return (
     <TableRow>
       <TableCell className="min-w-64 px-5 py-3">
         <div className="flex flex-col">
-          <Link
-            href={`/surveys/${row.survey._id}/edit`}
-            className="font-medium hover:underline"
-          >
-            {row.survey.title || "Untitled survey"}
+          <Link href={`/surveys/${row.survey._id}/edit`} className="font-medium hover:underline">
+            {row.survey.title || 'Untitled survey'}
           </Link>
           <span className="line-clamp-1 text-xs text-muted-foreground">
             {row.survey.description || `Created ${formatDate(row.survey._creationTime)}`}
@@ -386,14 +334,9 @@ function CreatedSurveyTableRow({
       <TableCell className="px-4 py-3">
         <SurveyStatusBadge status={row.survey.status} />
       </TableCell>
-      <TableCell className="px-4 py-3 text-muted-foreground">
-        {row.questionCount}
-      </TableCell>
+      <TableCell className="px-4 py-3 text-muted-foreground">{row.questionCount}</TableCell>
       <TableCell className="px-4 py-3 text-muted-foreground">
         {formatCount(row.responseCount, row.responseCountIsCapped)}
-      </TableCell>
-      <TableCell className="px-4 py-3 text-muted-foreground">
-        {row.lastResponseAtMs ? formatDate(row.lastResponseAtMs) : "None"}
       </TableCell>
       <TableCell className="px-5 py-3">
         <div className="flex justify-end gap-2">
@@ -408,11 +351,11 @@ function CreatedSurveyTableRow({
             size="sm"
             disabled={!canShare}
             onClick={onCopyRespondLink}
-            title={canShare ? "Copy response link" : "Publish before sharing"}
+            title={canShare ? 'Copy response link' : 'Publish before sharing'}
             className="gap-1.5"
           >
             <Link2 className="size-3.5" />
-            {copied ? "Copied" : "Share"}
+            {copied ? 'Copied' : 'Share'}
           </Button>
         </div>
       </TableCell>
@@ -422,85 +365,59 @@ function CreatedSurveyTableRow({
 
 function RespondedSurveysSection({ rows }: { rows: RespondedSurveyRow[] }) {
   return (
-    <Card id="responded" className="border-border shadow-sm">
-      <CardHeader className="border-b px-5 py-4">
-        <div>
-          <CardTitle className="text-sm font-semibold">
-            Surveys you responded to
-          </CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Signed-in response sessions are saved here so you can track what is
-            in progress or completed.
-          </p>
+    <section id="responded">
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={<Inbox className="size-8" />}
+          title="No responses yet"
+          description="When you answer a survey while signed in, it will appear here."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
+              <TableRow>
+                <TableHead className="px-5">Survey</TableHead>
+                <TableHead className="px-4">Owner</TableHead>
+                <TableHead className="px-4">Started</TableHead>
+                <TableHead className="px-5 text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <RespondedSurveyTableRow key={row.response._id} row={row} />
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={<Inbox className="size-8" />}
-            title="No responses yet"
-            description="When you answer a survey while signed in, it will appear here."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/50 text-xs text-muted-foreground">
-                <TableRow>
-                  <TableHead className="px-5">Survey</TableHead>
-                  <TableHead className="px-4">Owner</TableHead>
-                  <TableHead className="px-4">Status</TableHead>
-                  <TableHead className="px-4">Answers</TableHead>
-                  <TableHead className="px-4">Started</TableHead>
-                  <TableHead className="px-5 text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <RespondedSurveyTableRow key={row.response._id} row={row} />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 }
 
 function RespondedSurveyTableRow({ row }: { row: RespondedSurveyRow }) {
-  const canResume =
-    row.survey.status === "published" && row.response.status !== "completed";
+  const canResume = row.survey.status === 'published' && row.response.status !== 'completed';
 
   return (
     <TableRow>
       <TableCell className="min-w-64 px-5 py-3">
         <div className="flex flex-col">
           <span className="font-medium">{row.survey.title}</span>
-          <span className="line-clamp-1 text-xs text-muted-foreground">
-            {row.survey.description || "Voice survey"}
-          </span>
+          <span className="line-clamp-1 text-xs text-muted-foreground">{row.survey.description || 'Voice survey'}</span>
         </div>
       </TableCell>
       <TableCell className="px-4 py-3 text-muted-foreground">
-        {row.creator?.name ?? row.creator?.email ?? "Unknown owner"}
+        {row.creator?.name ?? row.creator?.email ?? 'Unknown owner'}
       </TableCell>
-      <TableCell className="px-4 py-3">
-        <ResponseStatusBadge status={row.response.status} />
-      </TableCell>
-      <TableCell className="px-4 py-3 text-muted-foreground">
-        {row.answerCount} / {row.questionCount}
-      </TableCell>
-      <TableCell className="px-4 py-3 text-muted-foreground">
-        {formatDate(row.response.startedAtMs)}
-      </TableCell>
+      <TableCell className="px-4 py-3 text-muted-foreground">{formatDate(row.response.startedAtMs)}</TableCell>
       <TableCell className="px-5 py-3 text-right">
         <Button asChild={canResume} variant="outline" size="sm" disabled={!canResume}>
           {canResume ? (
             <Link href={`/surveys/${row.survey._id}/respond`}>
-              {row.response.status === "abandoned" ? "Restart" : "Resume"}
+              {row.response.status === 'abandoned' ? 'Restart' : 'Resume'}
             </Link>
           ) : (
-            <span>{row.response.status === "completed" ? "Completed" : "Unavailable"}</span>
+            <span>{row.response.status === 'completed' ? 'Completed' : 'Unavailable'}</span>
           )}
         </Button>
       </TableCell>
@@ -521,14 +438,10 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="rounded-full border-2 border-dashed border-border p-5 text-muted-foreground/50">
-        {icon}
-      </div>
+      <div className="rounded-full border-2 border-dashed border-border p-5 text-muted-foreground/50">{icon}</div>
       <div>
         <p className="text-sm font-medium">{title}</p>
-        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-          {description}
-        </p>
+        <p className="mt-1 max-w-sm text-xs text-muted-foreground">{description}</p>
       </div>
       {action ? <div className="mt-1">{action}</div> : null}
     </div>
@@ -566,41 +479,31 @@ function DashboardLoading() {
   );
 }
 
-function SurveyStatusBadge({ status }: { status: Doc<"surveys">["status"] }) {
+function SurveyStatusBadge({ status }: { status: Doc<'surveys'>['status'] }) {
   return (
-    <Badge
-      variant="outline"
-      className={cn("capitalize", surveyStatusStyles[status])}
-    >
+    <Badge variant="outline" className={cn('capitalize', surveyStatusStyles[status])}>
       {status}
     </Badge>
   );
 }
 
-function ResponseStatusBadge({
-  status,
-}: {
-  status: Doc<"surveyResponses">["status"];
-}) {
+function ResponseStatusBadge({ status }: { status: Doc<'surveyResponses'>['status'] }) {
   return (
-    <Badge
-      variant="outline"
-      className={cn("capitalize", responseStatusStyles[status])}
-    >
-      {status.replace("-", " ")}
+    <Badge variant="outline" className={cn('capitalize', responseStatusStyles[status])}>
+      {status.replace('-', ' ')}
     </Badge>
   );
 }
 
 function formatCount(count: number, capped: boolean) {
-  return `${count}${capped ? "+" : ""}`;
+  return `${count}${capped ? '+' : ''}`;
 }
 
 function formatDate(value: number) {
   return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   }).format(new Date(value));
 }
