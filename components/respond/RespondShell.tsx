@@ -8,7 +8,7 @@ import {
   useConversationStatus,
 } from '@elevenlabs/react';
 import type { Callbacks, Conversation } from '@elevenlabs/client';
-import { useAction, useMutation } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -18,6 +18,22 @@ import { ConversationTranscript } from './ConversationTranscript';
 import { VoiceControlPanel } from './VoiceControlPanel';
 
 export type AgentStatus = 'idle' | 'connecting' | 'agent-speaking' | 'user-speaking' | 'processing' | 'error';
+
+export function getAgentStatus(
+  optimisticStatus: AgentStatus,
+  conversationStatus: 'disconnected' | 'connecting' | 'connected' | 'error',
+  mode: { isSpeaking: boolean; isListening: boolean },
+): AgentStatus {
+  if (optimisticStatus === 'error' || conversationStatus === 'error') return 'error';
+  if (conversationStatus === 'connected') {
+    if (mode.isSpeaking) return 'agent-speaking';
+    if (mode.isListening) return 'user-speaking';
+    return 'processing';
+  }
+  if (optimisticStatus === 'connecting' || conversationStatus === 'connecting') return 'connecting';
+  if (conversationStatus === 'disconnected') return 'idle';
+  return 'processing';
+}
 
 export interface TranscriptEntry {
   id: string;
@@ -54,6 +70,7 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
   const mode = useConversationMode();
   const startVoiceResponse = useAction(api.elevenlabs.startVoiceResponse);
   const attachConversation = useMutation(api.surveyResponses.attachConversation);
+  const survey = useQuery(api.surveys.get, { surveyId });
 
   const [status, setStatus] = useState<AgentStatus>('idle');
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -145,7 +162,7 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
   return (
     <div className="flex h-screen flex-col bg-background">
       <RespondHeader
-        title={session?.surveyTitle ?? 'Voice survey'}
+        title={survey?.title ?? 'Voice survey'}
         currentQuestion={Math.min(currentQuestion, totalQuestions)}
         totalQuestions={totalQuestions}
         isActive={isSessionActive}
@@ -161,22 +178,3 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
   );
 }
 
-function getAgentStatus(
-  optimisticStatus: AgentStatus,
-  conversationStatus: 'disconnected' | 'connecting' | 'connected' | 'error',
-  mode: { isSpeaking: boolean; isListening: boolean },
-): AgentStatus {
-  if (optimisticStatus === 'error' || conversationStatus === 'error') {
-    return 'error';
-  }
-  if (conversationStatus === 'connected') {
-    if (mode.isSpeaking) return 'agent-speaking';
-    if (mode.isListening) return 'user-speaking';
-    return 'processing';
-  }
-  if (optimisticStatus === 'connecting' || conversationStatus === 'connecting') {
-    return 'connecting';
-  }
-  if (conversationStatus === 'disconnected') return 'idle';
-  return 'processing';
-}

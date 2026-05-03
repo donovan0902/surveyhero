@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SurveyPreviewDrawer } from "@/components/builder/SurveyPreviewDrawer";
 import { Separator } from "@/components/ui/separator";
 import { AuthStatus } from "@/components/AuthStatus";
 import { api } from "@/convex/_generated/api";
@@ -48,13 +49,14 @@ export function BuilderTopBar({
   const [copied, setCopied] = useState(false);
   const [publishState, setPublishState] = useState<"idle" | "busy">("idle");
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const debouncedSaveTitle = useDebouncedCallback((value: string) => {
     onTitleChange(value);
   }, 400);
 
   const isPublished = survey.status === "published";
-  const canPreview = isPublished;
+  const canPreview = questionCount > 0;
   const canPublish = questionCount > 0;
 
   async function handlePublish() {
@@ -88,6 +90,7 @@ export function BuilderTopBar({
   }
 
   return (
+    <>
     <header className="relative flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur z-20">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Mic className="size-4 text-primary" />
@@ -142,25 +145,17 @@ export function BuilderTopBar({
 
       <div className="flex-1" />
 
-      {canPreview ? (
-        <Link href={`/surveys/${survey._id}/respond`} target="_blank">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Eye className="size-3.5" />
-            Preview
-          </Button>
-        </Link>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled
-          title="Publish first to preview"
-        >
-          <Eye className="size-3.5" />
-          Preview
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={!canPreview}
+        title={!canPreview ? "Add at least one question to preview" : undefined}
+        onClick={() => setPreviewOpen(true)}
+      >
+        <Eye className="size-3.5" />
+        Preview
+      </Button>
 
       {isPublished ? (
         <Button
@@ -217,5 +212,12 @@ export function BuilderTopBar({
         </div>
       )}
     </header>
+    <SurveyPreviewDrawer
+      surveyId={survey._id}
+      surveyTitle={survey.title}
+      open={previewOpen}
+      onOpenChange={setPreviewOpen}
+    />
+    </>
   );
 }

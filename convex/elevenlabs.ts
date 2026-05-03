@@ -179,7 +179,8 @@ async function ingestPostCallWebhook(
   const surveyResponse = byConversationId ?? byElevenLabsUserId;
 
   if (!surveyResponse) {
-    throw new Error('Survey response not found for ElevenLabs webhook');
+    console.log('No survey response found for webhook (likely a preview call) — skipping.');
+    return;
   }
 
   const survey = await ctx.db.get(surveyResponse.surveyId);
@@ -248,6 +249,29 @@ export const syncAgentForSurvey = action({
     const context = await ctx.runQuery(internal.elevenlabs.getOwnedSurveyAgentContext, { surveyId: args.surveyId });
 
     return syncSurveyAgent(ctx, context);
+  },
+});
+
+export const startVoicePreview = action({
+  args: { surveyId: v.id('surveys') },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    signedUrl: string;
+    agentId: string;
+    surveyTitle: string;
+    totalQuestions: number;
+  }> => {
+    const context = await ctx.runQuery(internal.elevenlabs.getOwnedSurveyAgentContext, { surveyId: args.surveyId });
+    const { agentId } = await syncSurveyAgent(ctx, context);
+    const signedUrl = await getSignedUrl(agentId);
+    return {
+      signedUrl,
+      agentId,
+      surveyTitle: context.survey.title,
+      totalQuestions: context.questions.length,
+    };
   },
 });
 
