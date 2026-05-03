@@ -63,6 +63,9 @@ export default defineSchema({
     completedAtMs: v.optional(v.number()),
     elevenLabsConversationId: v.optional(v.string()),
     analysisReceivedAtMs: v.optional(v.number()),
+    // Tracks live progress as the agent records answers via record_answer tool
+    // calls. Cleared once the post-call webhook flips status to "completed".
+    currentQuestionId: v.optional(v.id("questions")),
   })
     .index("by_surveyId", ["surveyId"])
     .index("by_respondentId", ["respondentId"])

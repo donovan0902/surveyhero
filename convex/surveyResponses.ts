@@ -143,9 +143,14 @@ export const attachConversation = mutation({
       if (!user || response.respondentId !== user._id) {
         throw new Error("Response not found or access denied");
       }
-    } else if (response.elevenLabsConversationId) {
-      throw new Error("Response already has a conversation attached");
+    } else if (
+      response.elevenLabsConversationId &&
+      response.elevenLabsConversationId !== args.conversationId
+    ) {
+      throw new Error("Response already has a different conversation attached");
     }
+
+    if (response.elevenLabsConversationId === args.conversationId) return;
 
     await ctx.db.patch(args.responseId, {
       elevenLabsConversationId: args.conversationId,
@@ -418,6 +423,44 @@ export const getAnswersForQuestion = query({
       .query("questionResponses")
       .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
       .collect();
+  },
+});
+
+// Live progress for the RespondHeader. Driven by surveyResponses.currentQuestionId
+// (set initially to the first question and advanced by the record_answer tool),
+// not by transcript turn counting. Anyone with the responseId can read it —
+// this is the same trust boundary as joining the voice session.
+export const getRespondProgress = query({
+  args: { responseId: v.id("surveyResponses") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    currentQuestionOrder: number;
+    totalQuestions: number;
+    status: Doc<"surveyResponses">["status"];
+  } | null> => {
+    const response = await ctx.db.get(args.responseId);
+    if (!response) return null;
+
+    const questions = await ctx.db
+      .query("questions")
+      .withIndex("by_surveyId_and_order", (q) =>
+        q.eq("surveyId", response.surveyId),
+      )
+      .order("asc")
+      .collect();
+
+    const totalQuestions = questions.length;
+    const currentQuestion = response.currentQuestionId
+      ? questions.find((q) => q._id === response.currentQuestionId)
+      : null;
+
+    return {
+      currentQuestionOrder: currentQuestion?.order ?? 1,
+      totalQuestions: Math.max(1, totalQuestions),
+      status: response.status,
+    };
   },
 });
 

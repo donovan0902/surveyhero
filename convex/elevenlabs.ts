@@ -13,8 +13,6 @@ const DEFAULT_LLM = 'gemini-2.5-flash';
 const DEFAULT_VOICE_ID = 'XcXEQzuLXRU9RcfWzEJt';
 const MAX_DATA_COLLECTION_ITEMS = 25;
 
-const extractedValueValidator = v.union(v.string(), v.number(), v.boolean(), v.null());
-
 async function requireUser(ctx: MutationCtx | QueryCtx): Promise<Doc<'users'>> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error('Unauthenticated');
@@ -107,6 +105,12 @@ export const getOrCreateVoiceResponse = internalMutation({
       throw new Error('Survey is not available for responses');
     }
 
+    const firstQuestion = await ctx.db
+      .query('questions')
+      .withIndex('by_surveyId_and_order', (q) => q.eq('surveyId', args.surveyId))
+      .order('asc')
+      .first();
+
     if (user) {
       const existing = await ctx.db
         .query('surveyResponses')
@@ -117,10 +121,16 @@ export const getOrCreateVoiceResponse = internalMutation({
         if (existing.status === 'completed') {
           throw new ConvexError('Survey response already completed');
         }
+        // Restart an abandoned response from question 1. Existing questionResponses
+        // rows from the prior attempt are NOT deleted — they will be overwritten as
+        // the agent progresses. If the respondent abandons again mid-way, answers
+        // beyond their stopping point will reflect the previous attempt until
+        // overwritten. A future clean-restart path would delete those stale rows here.
         if (existing.status === 'abandoned') {
           await ctx.db.patch(existing._id, {
             status: 'in-progress',
             startedAtMs: Date.now(),
+            ...(firstQuestion ? { currentQuestionId: firstQuestion._id } : {}),
           });
         }
         return { responseId: existing._id, respondentId: user._id };
@@ -132,52 +142,170 @@ export const getOrCreateVoiceResponse = internalMutation({
       ...(user ? { respondentId: user._id } : {}),
       status: 'in-progress',
       startedAtMs: Date.now(),
+      ...(firstQuestion ? { currentQuestionId: firstQuestion._id } : {}),
     });
 
     return user ? { responseId, respondentId: user._id } : { responseId };
   },
 });
 
+// Server-tool entrypoint. The ElevenLabs agent calls this for every question
+// it asks: it carries a data_collection_id (one per question) plus a raw
+// string value. We validate against the question type — for closed questions
+// the value must exactly match one of question.options — and persist before
+// advancing currentQuestionId.
+export const recordToolAnswer = internalMutation({
+  args: {
+    responseId: v.optional(v.string()),
+    conversationId: v.optional(v.string()),
+    dataCollectionId: v.string(),
+    value: v.string(),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    nextQuestion?: { id: Id<'questions'>; prompt: string; order: number } | null;
+  }> => {
+    const normalizedResponseId = args.responseId ? ctx.db.normalizeId('surveyResponses', args.responseId) : null;
+    const surveyResponse = await resolveSurveyResponse(ctx, {
+      responseId: normalizedResponseId ?? undefined,
+      conversationId: args.conversationId,
+    });
+    if (!surveyResponse) {
+      return { ok: false, error: 'Survey response not found' };
+    }
+
+    const questions = await ctx.db
+      .query('questions')
+      .withIndex('by_surveyId_and_order', (q) => q.eq('surveyId', surveyResponse.surveyId))
+      .order('asc')
+      .collect();
+
+    const question = questions.find((q) => getDataCollectionId(q) === args.dataCollectionId);
+    if (!question) {
+      return { ok: false, error: `Unknown data_collection_id: ${args.dataCollectionId}` };
+    }
+
+    const validation = validateAndCoerceValue(question, args.value);
+    if (!validation.ok) {
+      return { ok: false, error: validation.error };
+    }
+
+    await upsertQuestionAnswer(ctx, {
+      surveyResponse,
+      question,
+      dataCollectionId: args.dataCollectionId,
+      response: validation.normalized,
+    });
+
+    const nextQuestion = questions.find((q) => q.order > question.order) ?? null;
+    await ctx.db.patch(surveyResponse._id, {
+      currentQuestionId: nextQuestion ? nextQuestion._id : question._id,
+      ...(args.conversationId && !surveyResponse.elevenLabsConversationId
+        ? { elevenLabsConversationId: args.conversationId }
+        : {}),
+    });
+
+    return {
+      ok: true,
+      nextQuestion: nextQuestion
+        ? { id: nextQuestion._id, prompt: nextQuestion.prompt, order: nextQuestion.order }
+        : null,
+    };
+  },
+});
+
+async function resolveSurveyResponse(
+  ctx: MutationCtx,
+  args: { responseId?: Id<'surveyResponses'>; conversationId?: string },
+): Promise<Doc<'surveyResponses'> | null> {
+  if (args.conversationId) {
+    const byConversation = await ctx.db
+      .query('surveyResponses')
+      .withIndex('by_elevenLabsConversationId', (q) => q.eq('elevenLabsConversationId', args.conversationId))
+      .unique();
+    if (byConversation) return byConversation;
+  }
+  if (args.responseId) {
+    return ctx.db.get(args.responseId);
+  }
+  return null;
+}
+
+type Validation = { ok: true; normalized: string } | { ok: false; error: string };
+
+function validateAndCoerceValue(question: Doc<'questions'>, raw: string): Validation {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    if (question.required) {
+      return { ok: false, error: 'Empty answer not allowed for required question' };
+    }
+    return { ok: true, normalized: '' };
+  }
+
+  if (question.type === 'closed') {
+    const options = question.options ?? [];
+    const exact = options.find((option) => option === trimmed);
+    if (exact) return { ok: true, normalized: exact };
+    const lower = trimmed.toLowerCase();
+    const caseInsensitive = options.find((option) => option.toLowerCase() === lower);
+    if (caseInsensitive) return { ok: true, normalized: caseInsensitive };
+    return {
+      ok: false,
+      error: `Value "${trimmed}" is not one of the configured options: ${options.join(', ')}`,
+    };
+  }
+
+  if (question.type === 'yes-no') {
+    const lower = trimmed.toLowerCase();
+    if (['yes', 'true', 'y', '1'].includes(lower)) return { ok: true, normalized: 'true' };
+    if (['no', 'false', 'n', '0'].includes(lower)) return { ok: true, normalized: 'false' };
+    return { ok: false, error: `Value "${trimmed}" is not a yes/no answer` };
+  }
+
+  if (question.type === 'rating') {
+    const parsed = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(parsed)) {
+      return { ok: false, error: `Value "${trimmed}" is not an integer rating` };
+    }
+    return { ok: true, normalized: String(parsed) };
+  }
+
+  return { ok: true, normalized: trimmed };
+}
+
 export const handlePostCallWebhook = internalMutation({
   args: {
     agentId: v.string(),
     conversationId: v.string(),
     responseIdFromElevenLabsUserId: v.optional(v.string()),
-    dataCollectionResults: v.array(
-      v.object({
-        dataCollectionId: v.string(),
-        value: extractedValueValidator,
-      }),
-    ),
   },
   handler: async (ctx, args): Promise<void> => {
     await ingestPostCallWebhook(ctx, args);
   },
 });
 
+// Two paths write to questionResponses:
+//
+//   1. recordToolAnswer (mid-call, server tool) — source of truth for all
+//      question answers. Validates per type, advances currentQuestionId.
+//
+//   2. ingestPostCallWebhook (post-call) — session lifecycle only.
+//      Decides completed vs abandoned based on required-question coverage,
+//      then sets status / completedAtMs / analysisReceivedAtMs.
+//      Does NOT write any answers.
 async function ingestPostCallWebhook(
   ctx: MutationCtx,
   args: {
     agentId: string;
     conversationId: string;
     responseIdFromElevenLabsUserId?: string;
-    dataCollectionResults: {
-      dataCollectionId: string;
-      value: string | number | boolean | null;
-    }[];
   },
 ): Promise<void> {
-  const byConversationId = await ctx.db
-    .query('surveyResponses')
-    .withIndex('by_elevenLabsConversationId', (q) => q.eq('elevenLabsConversationId', args.conversationId))
-    .unique();
-
-  const responseIdFromElevenLabsUserId = args.responseIdFromElevenLabsUserId
-    ? ctx.db.normalizeId('surveyResponses', args.responseIdFromElevenLabsUserId)
-    : null;
-  const byElevenLabsUserId = responseIdFromElevenLabsUserId ? await ctx.db.get(responseIdFromElevenLabsUserId) : null;
-  const surveyResponse = byConversationId ?? byElevenLabsUserId;
-
+  const surveyResponse = await resolveSurveyResponseForWebhook(ctx, args);
   if (!surveyResponse) {
     console.log('No survey response found for webhook (likely a preview call) — skipping.');
     return;
@@ -188,59 +316,110 @@ async function ingestPostCallWebhook(
     throw new Error('Webhook agent does not match survey agent');
   }
 
-  const questions = await ctx.db
-    .query('questions')
-    .withIndex('by_surveyId_and_order', (q) => q.eq('surveyId', surveyResponse.surveyId))
-    .order('asc')
+  const questions = await listQuestions(ctx, surveyResponse.surveyId);
+
+  await finalizeSurveyResponse(ctx, {
+    surveyResponse,
+    questions,
+    conversationId: args.conversationId,
+  });
+}
+
+async function resolveSurveyResponseForWebhook(
+  ctx: MutationCtx,
+  args: { conversationId: string; responseIdFromElevenLabsUserId?: string },
+): Promise<Doc<'surveyResponses'> | null> {
+  const byConversationId = await ctx.db
+    .query('surveyResponses')
+    .withIndex('by_elevenLabsConversationId', (q) => q.eq('elevenLabsConversationId', args.conversationId))
+    .unique();
+  if (byConversationId) return byConversationId;
+
+  const normalizedId = args.responseIdFromElevenLabsUserId
+    ? ctx.db.normalizeId('surveyResponses', args.responseIdFromElevenLabsUserId)
+    : null;
+  return normalizedId ? ctx.db.get(normalizedId) : null;
+}
+
+async function finalizeSurveyResponse(
+  ctx: MutationCtx,
+  args: {
+    surveyResponse: Doc<'surveyResponses'>;
+    questions: Doc<'questions'>[];
+    conversationId: string;
+  },
+): Promise<void> {
+  const answers = await ctx.db
+    .query('questionResponses')
+    .withIndex('by_surveyResponseId', (q) => q.eq('surveyResponseId', args.surveyResponse._id))
     .collect();
 
-  const questionsByDataCollectionId = new Map(
-    questions.map((question) => [getDataCollectionId(question), question._id]),
-  );
+  const answersByQuestionId = new Map(answers.map((a) => [a.questionId, a]));
+  const allRequired = hasAllRequiredAnswers(args.questions, answersByQuestionId);
 
-  const questionsById = new Map(questions.map((question) => [question._id, question]));
-
-  for (const result of args.dataCollectionResults) {
-    const questionId = questionsByDataCollectionId.get(result.dataCollectionId);
-    if (!questionId || result.value === null) continue;
-
-    const existing = await ctx.db
-      .query('questionResponses')
-      .withIndex('by_surveyResponseId_and_questionId', (q) =>
-        q.eq('surveyResponseId', surveyResponse._id).eq('questionId', questionId),
-      )
-      .unique();
-
-    const fields = {
-      surveyResponseId: surveyResponse._id,
-      questionId,
-      surveyId: surveyResponse.surveyId,
-      ...(surveyResponse.respondentId ? { respondentId: surveyResponse.respondentId } : {}),
-      response: String(result.value),
-      dataCollectionId: result.dataCollectionId,
-    };
-
-    let questionResponseId: Id<'questionResponses'>;
-    if (existing) {
-      await ctx.db.patch(existing._id, fields);
-      questionResponseId = existing._id;
-    } else {
-      questionResponseId = await ctx.db.insert('questionResponses', fields);
-    }
-
-    if (questionsById.get(questionId)?.type === 'open-ended') {
-      await ctx.scheduler.runAfter(0, internal.aggregations.extractThemesForResponse, {
-        questionResponseId,
-      });
-    }
-  }
-
-  await ctx.db.patch(surveyResponse._id, {
-    status: 'completed',
-    completedAtMs: Date.now(),
+  await ctx.db.patch(args.surveyResponse._id, {
+    status: allRequired ? 'completed' : 'abandoned',
+    ...(allRequired ? { completedAtMs: Date.now() } : {}),
     analysisReceivedAtMs: Date.now(),
     elevenLabsConversationId: args.conversationId,
+    currentQuestionId: undefined,
   });
+}
+
+function hasAllRequiredAnswers(
+  questions: Doc<'questions'>[],
+  answersByQuestionId: Map<Id<'questions'>, Doc<'questionResponses'>>,
+): boolean {
+  return questions
+    .filter((q) => q.required)
+    .every((q) => {
+      const a = answersByQuestionId.get(q._id);
+      return a !== undefined && a.response.trim() !== '';
+    });
+}
+
+async function upsertQuestionAnswer(
+  ctx: MutationCtx,
+  args: {
+    surveyResponse: Doc<'surveyResponses'>;
+    question: Doc<'questions'>;
+    dataCollectionId: string;
+    response: string;
+  },
+): Promise<Id<'questionResponses'> | null> {
+  const { surveyResponse, question, dataCollectionId, response } = args;
+
+  const existing = await ctx.db
+    .query('questionResponses')
+    .withIndex('by_surveyResponseId_and_questionId', (q) =>
+      q.eq('surveyResponseId', surveyResponse._id).eq('questionId', question._id),
+    )
+    .unique();
+
+  const fields = {
+    surveyResponseId: surveyResponse._id,
+    questionId: question._id,
+    surveyId: surveyResponse.surveyId,
+    ...(surveyResponse.respondentId ? { respondentId: surveyResponse.respondentId } : {}),
+    response,
+    dataCollectionId,
+  };
+
+  let questionResponseId: Id<'questionResponses'>;
+  if (existing) {
+    await ctx.db.patch(existing._id, fields);
+    questionResponseId = existing._id;
+  } else {
+    questionResponseId = await ctx.db.insert('questionResponses', fields);
+  }
+
+  if (question.type === 'open-ended') {
+    await ctx.scheduler.runAfter(0, internal.aggregations.extractThemesForResponse, {
+      questionResponseId,
+    });
+  }
+
+  return questionResponseId;
 }
 
 export const syncAgentForSurvey = action({
@@ -339,6 +518,15 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
     );
   }
 
+  const siteUrl = process.env.CONVEX_SITE_URL;
+  if (!siteUrl) {
+    throw new Error('CONVEX_SITE_URL is not configured');
+  }
+  const toolSecret = process.env.ELEVENLABS_TOOL_SECRET;
+  if (!toolSecret) {
+    throw new Error('ELEVENLABS_TOOL_SECRET is not configured');
+  }
+
   return {
     name: `SurveyHero - ${survey.title}`,
     tags: ['surveyhero', `survey_${survey._id}`],
@@ -350,6 +538,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
           temperature: 0.5,
+          tools: [buildRecordAnswerTool(siteUrl, toolSecret, questions)],
           built_in_tools: {
             end_call: {
               name: 'end_call',
@@ -372,15 +561,75 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
       auth: {
         enable_auth: true,
       },
-      data_collection: Object.fromEntries(
-        questions.map((question) => [
-          getDataCollectionId(question),
-          {
-            type: getDataCollectionType(question),
-            description: getDataCollectionDescription(question),
+    },
+  };
+}
+
+function buildRecordAnswerTool(
+  siteUrl: string,
+  toolSecret: string,
+  questions: Doc<'questions'>[],
+): Record<string, unknown> {
+  const dataCollectionIds = questions.map((question) => getDataCollectionId(question));
+  const valueGuidance = questions
+    .map((question) => {
+      const id = getDataCollectionId(question);
+      if (question.type === 'closed' && question.options?.length) {
+        return `- ${id} (closed): pass exactly one of: ${question.options.join(' | ')}`;
+      }
+      if (question.type === 'yes-no') {
+        return `- ${id} (yes-no): pass "yes" or "no"`;
+      }
+      if (question.type === 'rating') {
+        return `- ${id} (rating): pass an integer like "4"`;
+      }
+      return `- ${id} (open-ended): pass the respondent's answer in their own words, concise`;
+    })
+    .join('\n');
+
+  return {
+    type: 'webhook',
+    name: 'record_answer',
+    description: [
+      "Record the respondent's answer to the current survey question and advance progress.",
+      'Call this exactly once after the respondent has given their answer to a question, before moving on.',
+      'For closed questions you MUST pass one of the configured options verbatim — pick the option whose meaning best matches what the respondent said.',
+      'If the respondent declines or skips, pass an empty string for value.',
+      'Per-question value guidance:',
+      valueGuidance,
+    ].join('\n'),
+    response_timeout_secs: 10,
+    api_schema: {
+      url: `${siteUrl}/elevenlabs/tools/record-answer?response_id={{survey_response_id}}&conversation_id={{system__conversation_id}}`,
+      method: 'POST',
+      request_headers: [
+        {
+          type: 'value',
+          name: 'X-SurveyHero-Secret',
+          value: toolSecret,
+        },
+        {
+          type: 'value',
+          name: 'Content-Type',
+          value: 'application/json',
+        },
+      ],
+      request_body_schema: {
+        type: 'object',
+        required: ['data_collection_id', 'value'],
+        properties: {
+          data_collection_id: {
+            type: 'string',
+            description: 'The data_collection_id of the question being answered.',
+            enum: dataCollectionIds,
           },
-        ]),
-      ),
+          value: {
+            type: 'string',
+            description:
+              "The respondent's answer. For closed questions this must be one of the configured options verbatim. For yes-no use 'yes' or 'no'. For rating use the integer as a string. Use an empty string if the respondent declined.",
+          },
+        },
+      },
     },
   };
 }
@@ -401,7 +650,9 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     'Ask the respondent each survey question in order. Keep the conversation natural, concise, and neutral.',
     'Do not answer questions on behalf of the respondent, and do not invent survey answers.',
     "If the respondent is unclear, ask a short clarification according to the question's follow-up instruction.",
-    'After the final question, thank the respondent and end the conversation.',
+    'IMPORTANT: After the respondent answers each question, you MUST call the record_answer tool exactly once before moving on to the next question. Pass the question\'s data_collection_id (shown in brackets next to the question) and the respondent\'s answer. For closed questions, choose the option whose wording best matches what they said and pass that option verbatim. For yes-no, pass "yes" or "no". For rating, pass the integer as a string. If they decline, pass an empty string.',
+    'If the record_answer tool returns ok=false, briefly re-ask the question to get a clearer answer, then call record_answer again.',
+    'After the final question is recorded, thank the respondent and end the conversation.',
     survey.description ? `Survey description: ${survey.description}` : null,
     'Survey questions:',
     questionLines,
@@ -418,28 +669,6 @@ function getFollowUpInstruction(behavior: Doc<'questions'>['followUpBehavior']):
     return 'Continue with brief clarifying follow-ups until the respondent gives an answer or explicitly declines.';
   }
   return 'Do not ask a follow-up unless the respondent asks for clarification.';
-}
-
-function getDataCollectionType(question: Doc<'questions'>): 'string' | 'boolean' | 'integer' {
-  if (question.type === 'rating') return 'integer';
-  if (question.type === 'yes-no') return 'boolean';
-  return 'string';
-}
-
-function getDataCollectionDescription(question: Doc<'questions'>): string {
-  const base = `Extract the respondent's answer to this survey question: "${question.prompt}".`;
-
-  if (question.type === 'rating') {
-    return `${base} Return only the integer rating the respondent gave. Return null if no rating was provided.`;
-  }
-  if (question.type === 'yes-no') {
-    return `${base} Return true for yes/affirmative and false for no/negative. Return null if unclear.`;
-  }
-  if (question.type === 'closed' && question.options?.length) {
-    return `${base} Return the closest matching option from: ${question.options.join(', ')}. Return null if none was provided.`;
-  }
-
-  return `${base} Return the answer as concise text. Return null if the respondent did not answer.`;
 }
 
 function getDataCollectionId(question: Doc<'questions'>): string {

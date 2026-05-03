@@ -79,8 +79,12 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
 
   const currentStatus = getAgentStatus(status, conversationStatus, mode);
   const isSessionActive = currentStatus !== 'idle' && currentStatus !== 'error';
-  const currentQuestion = Math.max(1, transcript.filter((entry) => entry.role === 'agent').length);
-  const totalQuestions = session?.totalQuestions ?? 1;
+  const progress = useQuery(
+    api.surveyResponses.getRespondProgress,
+    session ? { responseId: session.responseId } : 'skip',
+  );
+  const totalQuestions = progress?.totalQuestions ?? session?.totalQuestions ?? 1;
+  const currentQuestion = progress?.currentQuestionOrder ?? 1;
 
   async function handleStart() {
     setStatus('connecting');

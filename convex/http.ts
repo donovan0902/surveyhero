@@ -6,16 +6,10 @@ import { authKit } from "./auth";
 const http = httpRouter();
 authKit.registerRoutes(http);
 
-type ExtractedValue = string | number | boolean | null;
-
 type PostCallWebhook = {
   agentId: string;
   conversationId: string;
   responseIdFromElevenLabsUserId?: string;
-  dataCollectionResults: {
-    dataCollectionId: string;
-    value: ExtractedValue;
-  }[];
 };
 
 http.route({
@@ -44,6 +38,64 @@ http.route({
 
     await ctx.runMutation(internal.elevenlabs.handlePostCallWebhook, webhook);
     return jsonResponse({ received: true }, 200);
+  }),
+});
+
+// Live server-tool endpoint called by the ElevenLabs agent each time it
+// records an answer. Auth is a static shared secret embedded in the agent
+// config as a request header. The agent supplies response_id and
+// conversation_id as URL templated dynamic variables.
+http.route({
+  path: "/elevenlabs/tools/record-answer",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const expectedSecret = process.env.ELEVENLABS_TOOL_SECRET;
+    if (!expectedSecret) {
+      return jsonResponse({ ok: false, error: "Tool secret not configured" }, 500);
+    }
+
+    const providedSecret = req.headers.get("x-surveyhero-secret");
+    if (
+      !providedSecret ||
+      providedSecret.length !== expectedSecret.length ||
+      !safeEqual(providedSecret, expectedSecret)
+    ) {
+      return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
+    }
+
+    const url = new URL(req.url);
+    const rawResponseId = url.searchParams.get("response_id");
+    const rawConversationId = url.searchParams.get("conversation_id");
+
+    let payload: unknown;
+    try {
+      payload = await req.json();
+    } catch {
+      return jsonResponse({ ok: false, error: "Invalid JSON body" }, 400);
+    }
+
+    const body = asRecord(payload);
+    const dataCollectionId = asString(body?.data_collection_id);
+    const value = typeof body?.value === "string" ? (body.value as string) : null;
+
+    if (!dataCollectionId || value === null) {
+      return jsonResponse(
+        { ok: false, error: "data_collection_id and value are required" },
+        400,
+      );
+    }
+
+    const responseId = rawResponseId && rawResponseId.length > 0 ? rawResponseId : undefined;
+    const conversationId = rawConversationId && rawConversationId.length > 0 ? rawConversationId : undefined;
+
+    const result = await ctx.runMutation(internal.elevenlabs.recordToolAnswer, {
+      ...(responseId ? { responseId } : {}),
+      ...(conversationId ? { conversationId } : {}),
+      dataCollectionId,
+      value,
+    });
+
+    return jsonResponse(result, result.ok ? 200 : 400);
   }),
 });
 
@@ -124,61 +176,11 @@ function extractPostCallWebhook(event: unknown): PostCallWebhook | null {
     asString(dynamicVariables?.survey_response_id) ??
     asString(dynamicVariables?.response_id);
 
-  const analysis = asRecord(data.analysis);
-
   return {
     agentId,
     conversationId,
     responseIdFromElevenLabsUserId,
-    dataCollectionResults: normalizeDataCollectionResults(
-      analysis?.data_collection_results,
-    ),
   };
-}
-
-function normalizeDataCollectionResults(
-  resultsRaw: unknown,
-): PostCallWebhook["dataCollectionResults"] {
-  if (Array.isArray(resultsRaw)) {
-    return resultsRaw.flatMap((item) => {
-      const record = asRecord(item);
-      const dataCollectionId =
-        asString(record?.data_collection_id) ??
-        asString(record?.dataCollectionId) ??
-        asString(record?.id) ??
-        asString(record?.name);
-      if (!dataCollectionId) return [];
-
-      return [
-        {
-          dataCollectionId,
-          value: normalizeExtractedValue(record?.value),
-        },
-      ];
-    });
-  }
-
-  const record = asRecord(resultsRaw);
-  if (!record) return [];
-
-  return Object.entries(record).map(([dataCollectionId, item]) => {
-    const itemRecord = asRecord(item);
-    return {
-      dataCollectionId,
-      value: normalizeExtractedValue(itemRecord?.value ?? item),
-    };
-  });
-}
-
-function normalizeExtractedValue(value: unknown): ExtractedValue {
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return value;
-  }
-  return null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
