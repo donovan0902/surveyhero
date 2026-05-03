@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -29,16 +31,30 @@ export function QuestionSidebar({
   onSelect,
   onAdd,
   onDelete,
+  onReorder,
 }: QuestionSidebarProps) {
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const resetDrag = () => {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+  };
+
   return (
     <Sidebar
       collapsible="none"
       className="w-72 shrink-0 border-r border-border"
     >
       <SidebarHeader className="flex-row items-center justify-between px-4 py-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Questions
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Questions
+          </span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+            {questions.length}
+          </Badge>
+        </div>
         <Button
           variant="ghost"
           size="icon-xs"
@@ -71,8 +87,22 @@ export function QuestionSidebar({
                 question={q}
                 index={index}
                 isSelected={q._id === selectedId}
+                isDragging={draggingIndex === index}
+                isDragOver={dragOverIndex === index && draggingIndex !== index}
                 onSelect={() => onSelect(q._id)}
                 onDelete={() => onDelete(q._id)}
+                onDragStart={() => setDraggingIndex(index)}
+                onDragOver={() => setDragOverIndex(index)}
+                onDragLeave={() => {
+                  setDragOverIndex((current) => (current === index ? null : current));
+                }}
+                onDrop={() => {
+                  if (draggingIndex !== null && draggingIndex !== index) {
+                    onReorder(draggingIndex, index);
+                  }
+                  resetDrag();
+                }}
+                onDragEnd={resetDrag}
               />
             ))}
           </SidebarGroup>

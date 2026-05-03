@@ -53,9 +53,18 @@ function QuestionCanvasInner({
               <Badge variant="outline" className="font-mono text-xs">
                 Q{question.order}
               </Badge>
-              <span className="text-xs text-muted-foreground">Voice prompt</span>
             </div>
-            <QuestionTypeSelector value={question.type} onChange={(type) => onUpdate(question._id, { type })} />
+            <div className="flex items-center gap-2">
+              {question.required ? (
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                  Required
+                </Badge>
+              ) : null}
+              <QuestionTypeSelector
+                value={question.type}
+                onChange={(type) => onUpdate(question._id, { type })}
+              />
+            </div>
           </div>
 
           <Card className="mb-4 border-border shadow-sm">
