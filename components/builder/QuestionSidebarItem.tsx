@@ -3,16 +3,8 @@
 import type { DragEvent } from 'react';
 import { GripVertical, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { Question, QuestionType } from './BuilderShell';
-
-const typeLabels: Record<QuestionType, string> = {
-  'open-ended': 'Open',
-  'closed': 'Closed',
-  'rating': 'Rating',
-  'yes-no': 'Yes/No',
-};
+import type { Question } from './BuilderShell';
 
 interface QuestionSidebarItemProps {
   question: Question;

@@ -6,23 +6,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
-import {
-  BarChart3,
-  CheckCircle2,
-  FilePlus2,
-  Inbox,
-  LayoutDashboard,
-  Link2,
-  Mic,
-  PenLine,
-  Send,
-  Sparkles,
-} from 'lucide-react';
+import { FilePlus2, Inbox, LayoutDashboard, Link2, Mic, PenLine } from 'lucide-react';
 
 import { AuthStatus } from '@/components/AuthStatus';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -57,15 +46,13 @@ export function DashboardShell() {
   const [copiedSurveyId, setCopiedSurveyId] = useState<Id<'surveys'> | null>(null);
 
   const stats = useMemo(() => {
-    const created = createdSurveys ?? [];
-    const responded = respondedSurveys ?? [];
+    const rows = createdSurveys ?? [];
     return {
-      createdCount: created.length,
-      publishedCount: created.filter((row) => row.survey.status === 'published').length,
-      responseCount: created.reduce((sum, row) => sum + row.responseCount, 0),
-      completedResponses: responded.filter((row) => row.response.status === 'completed').length,
+      createdCount: rows.length,
+      draftCount: rows.filter((row) => row.survey.status === 'draft').length,
+      responseCount: rows.reduce((sum, row) => sum + row.responseCount, 0),
     };
-  }, [createdSurveys, respondedSurveys]);
+  }, [createdSurveys]);
 
   async function handleCreateSurvey() {
     if (creating) return;
@@ -97,7 +84,14 @@ export function DashboardShell() {
               <DashboardLoading />
             ) : (
               <>
-                <SummaryGrid stats={stats} />
+                <DashboardHero
+                  stats={{
+                    createdCount: stats.createdCount,
+                    draftCount: stats.draftCount,
+                    responseCount: stats.responseCount,
+                    respondedCount: respondedSurveys.length,
+                  }}
+                />
                 <DashboardTablesTabs
                   createdRows={createdSurveys}
                   respondedRows={respondedSurveys}
@@ -138,75 +132,37 @@ function DashboardTopBar({ onCreateSurvey, creating }: { onCreateSurvey: () => v
   );
 }
 
-function DashboardHero({ onCreateSurvey, creating }: { onCreateSurvey: () => void; creating: boolean }) {
+function DashboardHero({
+  stats,
+}: {
+  stats: {
+    createdCount: number;
+    draftCount: number;
+    responseCount: number;
+    respondedCount: number;
+  };
+}) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-border bg-background p-6 shadow-sm sm:p-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,color-mix(in_oklch,var(--primary)_18%,transparent),transparent_32%),linear-gradient(135deg,transparent,oklch(0.963_0.002_197.1/_0.7))]" />
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl">
-          <Badge variant="outline" className="mb-4 gap-1.5 bg-background/80">
-            <Sparkles className="size-3" />
-            Voice surveys, ready to share
-          </Badge>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Manage the surveys you create and the ones you answer.
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            Build voice-led questionnaires, publish respondent links, and review answer summaries from one place.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={onCreateSurvey} disabled={creating} className="gap-1.5">
-            <FilePlus2 className="size-4" />
-            {creating ? 'Creating...' : 'Create survey'}
-          </Button>
-          <Button asChild variant="outline" className="gap-1.5">
-            <Link href="#responded">
-              <Inbox className="size-4" />
-              My responses
-            </Link>
-          </Button>
-        </div>
+    <section className="px-1 py-2 sm:px-2">
+      <div className="max-w-2xl">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Your surveys</h1>
+      </div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SimpleStat label="Created surveys" value={stats.createdCount} />
+        <SimpleStat label="Drafts" value={stats.draftCount} />
+        <SimpleStat label="Responses" value={stats.responseCount} />
+        <SimpleStat label="Answered" value={stats.respondedCount} />
       </div>
     </section>
   );
 }
 
-function SummaryGrid({
-  stats,
-}: {
-  stats: {
-    createdCount: number;
-    publishedCount: number;
-    responseCount: number;
-    completedResponses: number;
-  };
-}) {
+function SimpleStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <MetricCard label="Created surveys" value={stats.createdCount} icon={<PenLine className="size-4" />} />
-      <MetricCard label="Published" value={stats.publishedCount} icon={<Send className="size-4" />} />
-      <MetricCard label="Responses received" value={stats.responseCount} icon={<BarChart3 className="size-4" />} />
-      <MetricCard
-        label="Surveys completed"
-        value={stats.completedResponses}
-        icon={<CheckCircle2 className="size-4" />}
-      />
+    <div className="border-l border-border pl-4 first:pl-0 sm:first:border-l-0 xl:border-l">
+      <p className="text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
     </div>
-  );
-}
-
-function MetricCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
-  return (
-    <Card className="border-border shadow-sm">
-      <CardContent className="flex items-center justify-between py-2">
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
-        </div>
-        <div className="rounded-full bg-muted p-2 text-muted-foreground">{icon}</div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -380,6 +336,7 @@ function RespondedSurveysSection({ rows }: { rows: RespondedSurveyRow[] }) {
                 <TableHead className="px-5">Survey</TableHead>
                 <TableHead className="px-4">Owner</TableHead>
                 <TableHead className="px-4">Started</TableHead>
+                <TableHead className="px-4">Status</TableHead>
                 <TableHead className="px-5 text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -410,6 +367,9 @@ function RespondedSurveyTableRow({ row }: { row: RespondedSurveyRow }) {
         {row.creator?.name ?? row.creator?.email ?? 'Unknown owner'}
       </TableCell>
       <TableCell className="px-4 py-3 text-muted-foreground">{formatDate(row.response.startedAtMs)}</TableCell>
+      <TableCell className="px-4 py-3">
+        <ResponseStatusBadge status={row.response.status} />
+      </TableCell>
       <TableCell className="px-5 py-3 text-right">
         <Button asChild={canResume} variant="outline" size="sm" disabled={!canResume}>
           {canResume ? (
@@ -451,18 +411,19 @@ function EmptyState({
 function DashboardLoading() {
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <Card key={index} className="border-border shadow-sm">
-            <CardContent className="flex items-center justify-between py-2">
-              <div className="space-y-2">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-8 w-10" />
-              </div>
-              <Skeleton className="size-8 rounded-full" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="px-1 py-2 sm:px-2">
+        <div className="max-w-2xl">
+          <Skeleton className="h-10 w-56" />
+          <Skeleton className="mt-3 h-4 w-72" />
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="border-l border-border pl-4 first:pl-0 sm:first:border-l-0 xl:border-l">
+              <Skeleton className="h-8 w-14" />
+              <Skeleton className="mt-2 h-3 w-24" />
+            </div>
+          ))}
+        </div>
       </div>
       <Card className="border-border shadow-sm">
         <CardHeader className="border-b px-5 py-4">

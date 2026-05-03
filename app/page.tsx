@@ -1,23 +1,12 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { withAuth } from "@workos-inc/authkit-nextjs";
-import {
-  ArrowRight,
-  BarChart3,
-  CheckCircle2,
-  Mic,
-  Radio,
-  Sparkles,
-} from "lucide-react";
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { withAuth } from '@workos-inc/authkit-nextjs';
+import { ArrowRight, BarChart3, CheckCircle2, Mic, Radio, Sparkles } from 'lucide-react';
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthStatus } from '@/components/AuthStatus';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default async function Home() {
   const { accessToken } = await withAuth();
@@ -32,51 +21,26 @@ export default async function Home() {
         <header className="relative z-10 mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
             <Mic className="size-5 text-primary" />
-            <span className="text-sm font-semibold tracking-tight">
-              SurveyHero
-            </span>
+            <span className="text-sm font-semibold tracking-tight">SurveyHero</span>
           </Link>
           <nav className="flex items-center gap-2">
-            {isSignedIn ? (
-              <Button asChild size="sm">
-                <Link href="/dashboard">Dashboard</Link>
-              </Button>
-            ) : (
-              <>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/sign-in">Sign in</Link>
-                </Button>
-                <Button asChild size="sm">
-                  <Link href="/sign-up">Start building</Link>
-                </Button>
-              </>
-            )}
+            <AuthStatus />
           </nav>
         </header>
 
         <div className="relative z-10 mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
           <div className="max-w-3xl">
-            <Badge variant="outline" className="mb-5 gap-1.5 bg-background/70">
-              <Sparkles className="size-3" />
-              Voice-first surveys with AI summaries
-            </Badge>
             <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
               Ask better questions without making people type.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              Build a survey, publish a voice-agent link, and review the
-              responses with answer tables and generated themes.
+              Turn your surveys into conversations and get richer, more honest feedback.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="gap-1.5">
-                <Link href={isSignedIn ? "/dashboard" : "/sign-up"}>
-                  {isSignedIn ? "Go to dashboard" : "Create your first survey"}
+                <Link href={isSignedIn ? '/dashboard' : '/sign-up'}>
+                  {isSignedIn ? 'Go to dashboard' : 'Create your first survey'}
                   <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href={isSignedIn ? "/dashboard#responded" : "/sign-in"}>
-                  {isSignedIn ? "View my responses" : "Sign in"}
                 </Link>
               </Button>
             </div>
@@ -98,9 +62,7 @@ function LandingPreview() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Radio className="size-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">
-                Customer discovery
-              </CardTitle>
+              <CardTitle className="text-sm font-semibold">Customer discovery</CardTitle>
             </div>
             <Badge className="bg-emerald-600 text-white">Published</Badge>
           </div>
@@ -108,52 +70,26 @@ function LandingPreview() {
         <CardContent className="space-y-4 p-5">
           <div className="rounded-2xl border bg-card p-4">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Voice session
-              </span>
+              <span className="text-xs font-medium text-muted-foreground">Voice session</span>
               <Radio className="size-4 text-primary" />
             </div>
             <p className="text-sm leading-6">
-              “What problem were you trying to solve when you looked for this
-              product?”
+              “What problem were you trying to solve when you looked for this product?”
             </p>
             <div className="mt-4 grid grid-cols-12 items-end gap-1">
-              {[28, 42, 58, 38, 70, 52, 84, 44, 64, 36, 76, 46].map(
-                (height, index) => (
-                  <div
-                    key={index}
-                    className="rounded-full bg-primary/70"
-                    style={{ height }}
-                  />
-                ),
-              )}
+              {[28, 42, 58, 38, 70, 52, 84, 44, 64, 36, 76, 46].map((height, index) => (
+                <div key={index} className="rounded-full bg-primary/70" style={{ height }} />
+              ))}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <MiniMetric
-              label="Responses"
-              value="128"
-              icon={<BarChart3 className="size-4" />}
-            />
-            <MiniMetric
-              label="Complete"
-              value="84%"
-              icon={<CheckCircle2 className="size-4" />}
-            />
-            <MiniMetric
-              label="Themes"
-              value="12"
-              icon={<Sparkles className="size-4" />}
-            />
+            <MiniMetric label="Responses" value="128" icon={<BarChart3 className="size-4" />} />
+            <MiniMetric label="Complete" value="84%" icon={<CheckCircle2 className="size-4" />} />
+            <MiniMetric label="Themes" value="12" icon={<Sparkles className="size-4" />} />
           </div>
           <div className="rounded-2xl border bg-muted/40 p-4">
-            <p className="text-xs font-medium text-muted-foreground">
-              Top theme
-            </p>
-            <p className="mt-1 text-sm">
-              Teams want faster qualitative feedback without scheduling live
-              interviews.
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">Top theme</p>
+            <p className="mt-1 text-sm">Teams want faster qualitative feedback without scheduling live interviews.</p>
           </div>
         </CardContent>
       </Card>
@@ -161,15 +97,7 @@ function LandingPreview() {
   );
 }
 
-function MiniMetric({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-}) {
+function MiniMetric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <div className="rounded-2xl border bg-background p-3">
       <div className="mb-2 text-muted-foreground">{icon}</div>
