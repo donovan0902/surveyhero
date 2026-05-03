@@ -46,6 +46,7 @@ export function ResponsesShell({ surveyId: rawId }: ResponsesShellProps) {
     if (!dashboard || !selectedId) return null;
     return dashboard.responses.find((row) => row.response._id === selectedId) ?? null;
   }, [dashboard, selectedId]);
+  const [detailRow, setDetailRow] = useState<ResponseRow | null>(null);
 
   if (dashboard === undefined) {
     return (
@@ -116,7 +117,11 @@ export function ResponsesShell({ surveyId: rawId }: ResponsesShellProps) {
                   <ResponsesTable
                     dashboard={dashboard}
                     selectedId={selectedResponse?.response._id ?? null}
-                    onSelect={setSelectedId}
+                    onSelect={(id) => {
+                      const row = dashboard.responses.find((responseRow) => responseRow.response._id === id) ?? null;
+                      setDetailRow(row);
+                      setSelectedId(id);
+                    }}
                   />
                 </TabsContent>
               </Tabs>
@@ -125,7 +130,7 @@ export function ResponsesShell({ surveyId: rawId }: ResponsesShellProps) {
         </section>
         <ResponseDetail
           dashboard={dashboard}
-          row={selectedResponse}
+          row={selectedResponse ?? detailRow}
           open={selectedResponse !== null}
           onOpenChange={(open) => {
             if (!open) setSelectedId(null);
@@ -331,7 +336,7 @@ function ResponseDetail({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 p-0 sm:max-w-xl">
+      <SheetContent className="w-full gap-0 p-0 sm:max-w-2xl xl:max-w-3xl">
         <SheetHeader className="border-b pr-14">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
