@@ -3,7 +3,6 @@
 import { MicButton } from './MicButton';
 import { VoiceWaveform } from './VoiceWaveform';
 import { StatusIndicator } from './StatusIndicator';
-import { Separator } from '@/components/ui/separator';
 import type { AgentStatus } from './RespondShell';
 
 interface VoiceControlPanelProps {
@@ -27,12 +26,6 @@ export function VoiceControlPanel({ status, onStart, onStop }: VoiceControlPanel
             isActive={status === 'agent-speaking' || status === 'user-speaking'}
             variant={status === 'user-speaking' ? 'respondent' : 'agent'}
           />
-
-          {status === 'idle' && (
-            <p className="text-xs text-muted-foreground text-center">
-              Tap the microphone to begin — speak naturally when it&apos;s your turn.
-            </p>
-          )}
         </div>
       </div>
     </div>

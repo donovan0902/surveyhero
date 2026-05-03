@@ -38,13 +38,8 @@ export function SurveyPreviewDrawer({
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="flex flex-col">
-        <DrawerHeader className="shrink-0 border-b pb-3">
-          <div className="flex items-center justify-center gap-2 md:justify-start">
-            <DrawerTitle className="text-base">Preview Survey</DrawerTitle>
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              Responses not saved
-            </span>
-          </div>
+        <DrawerHeader className="sr-only">
+          <DrawerTitle>Preview Survey</DrawerTitle>
           <DrawerDescription className="sr-only">
             Voice preview of this survey. No responses will be recorded.
           </DrawerDescription>
@@ -128,7 +123,8 @@ function PreviewConversation({ surveyId, surveyTitle }: { surveyId: Id<'surveys'
         currentQuestion={Math.min(currentQuestion, totalQuestions)}
         totalQuestions={totalQuestions}
         isActive={isSessionActive}
-        className="border-b-0"
+        eyebrow="Preview survey"
+        notice="Responses not saved"
       />
       {(errorMessage || statusMessage) && (
         <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-center text-xs text-destructive">

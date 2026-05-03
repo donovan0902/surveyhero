@@ -8,6 +8,8 @@ interface RespondHeaderProps {
   currentQuestion: number;
   totalQuestions: number;
   isActive: boolean;
+  eyebrow?: string;
+  notice?: string;
   className?: string;
 }
 
@@ -16,6 +18,8 @@ export function RespondHeader({
   currentQuestion,
   totalQuestions,
   isActive,
+  eyebrow,
+  notice,
   className,
 }: RespondHeaderProps) {
   const progressPct = ((currentQuestion - 1) / totalQuestions) * 100;
@@ -24,11 +28,30 @@ export function RespondHeader({
     <header className={cn("shrink-0 border-b border-border bg-background/95 px-6 py-4 backdrop-blur", className)}>
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Mic className="size-4 text-primary" />
-            <h1 className="text-sm font-semibold text-foreground">{title}</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <Mic className="size-4 shrink-0 text-primary" />
+            <div className="min-w-0">
+              {(eyebrow || notice) && (
+                <div className="mb-0.5 flex flex-wrap items-center gap-2">
+                  {eyebrow && (
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {eyebrow}
+                    </span>
+                  )}
+                  {notice && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/30 dark:text-amber-400"
+                    >
+                      {notice}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              <h1 className="truncate text-sm font-semibold text-foreground">{title}</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-4 flex shrink-0 items-center gap-2">
             {isActive && (
               <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
                 Live session
