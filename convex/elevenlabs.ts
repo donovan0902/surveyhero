@@ -635,30 +635,74 @@ function buildRecordAnswerTool(
 }
 
 function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]): string {
-  const questionLines = questions
-    .map((question) => {
-      const options =
-        question.options && question.options.length > 0 ? ` Options: ${question.options.join(', ')}.` : '';
-      const required = question.required ? ' Required.' : ' Optional.';
-      const followUp = getFollowUpInstruction(question.followUpBehavior);
-      return `${question.order}. [${getDataCollectionId(question)}] ${question.prompt}${options}${required} ${followUp}`;
-    })
-    .join('\n');
-
   return [
-    'You are a voice survey interviewer for SurveyHero.',
-    'Ask the respondent each survey question in order. Keep the conversation natural, concise, and neutral.',
-    'Do not answer questions on behalf of the respondent, and do not invent survey answers.',
-    "If the respondent is unclear, ask a short clarification according to the question's follow-up instruction.",
-    'IMPORTANT: After the respondent answers each question, you MUST call the record_answer tool exactly once before moving on to the next question. Pass the question\'s data_collection_id (shown in brackets next to the question) and the respondent\'s answer. For closed questions, choose the option whose wording best matches what they said and pass that option verbatim. For yes-no, pass "yes" or "no". For rating, pass the integer as a string. If they decline, pass an empty string.',
-    'If the record_answer tool returns ok=false, briefly re-ask the question to get a clearer answer, then call record_answer again.',
-    'After the final question is recorded, thank the respondent and end the conversation.',
-    survey.description ? `Survey description: ${survey.description}` : null,
-    'Survey questions:',
-    questionLines,
+    '# Role',
+    'You are a voice survey interviewer for SurveyHero. Your job is to collect the respondent\'s answers accurately, one question at a time.',
+
+    '# Interview Style',
+    '- Ask questions in the exact order listed under Survey Questions.',
+    '- Keep the conversation natural, concise, and neutral.',
+    '- Do not answer questions on behalf of the respondent.',
+    '- Do not invent or infer survey answers when the respondent has not provided one.',
+    '- If the respondent asks for clarification, briefly explain the current question without changing its meaning.',
+
+    '# Recording Answers',
+    '- After the respondent answers a question, call record_answer exactly once before moving to the next question.',
+    '- Use the question\'s data_collection_id exactly as shown.',
+    '- For closed questions, pass exactly one configured option verbatim. Pick the option whose meaning best matches the respondent\'s answer.',
+    '- For yes-no questions, pass exactly "yes" or "no".',
+    '- For rating questions, pass the rating as an integer string, for example "4".',
+    '- For open-ended questions, pass a concise answer in the respondent\'s own words.',
+    '- If the respondent explicitly declines or skips a question, pass an empty string.',
+    '- If record_answer returns ok=false, briefly re-ask the current question for a clearer answer, then call record_answer again.',
+    '- After the final question is recorded successfully, thank the respondent and end the conversation.',
+
+    '# Survey',
+    `Title: ${survey.title}`,
+    survey.description ? `Description: ${survey.description}` : null,
+
+    '# Survey Questions',
+    questions.map((question) => buildQuestionPromptBlock(question)).join('\n\n'),
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+function buildQuestionPromptBlock(question: Doc<'questions'>): string {
+  const lines = [
+    `Question ${question.order}`,
+    `data_collection_id: ${getDataCollectionId(question)}`,
+    `prompt: ${question.prompt}`,
+    question.description ? `context: ${question.description}` : null,
+    `type: ${question.type}`,
+    `required: ${question.required ? 'yes' : 'no'}`,
+    getOptionsInstruction(question),
+    `answer_format: ${getAnswerFormatInstruction(question)}`,
+    `follow_up: ${getFollowUpInstruction(question.followUpBehavior)}`,
+  ];
+
+  return lines.filter(Boolean).join('\n');
+}
+
+function getOptionsInstruction(question: Doc<'questions'>): string | null {
+  if (question.type !== 'closed' || !question.options?.length) {
+    return null;
+  }
+
+  return `options: ${question.options.map((option) => `"${option}"`).join(' | ')}`;
+}
+
+function getAnswerFormatInstruction(question: Doc<'questions'>): string {
+  if (question.type === 'closed') {
+    return 'Record exactly one configured option verbatim.';
+  }
+  if (question.type === 'yes-no') {
+    return 'Record exactly "yes" or "no".';
+  }
+  if (question.type === 'rating') {
+    return 'Record an integer string.';
+  }
+  return 'Record a concise answer in the respondent\'s own words.';
 }
 
 function getFollowUpInstruction(behavior: Doc<'questions'>['followUpBehavior']): string {
