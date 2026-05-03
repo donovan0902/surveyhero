@@ -32,6 +32,7 @@ type ResponseDashboard = {
   completedCount: number;
   inProgressCount: number;
   abandonedCount: number;
+  averageResponseTimeMs: number | null;
 };
 
 type MyResponseDashboardRow = {
@@ -355,6 +356,25 @@ export const getSurveyResponseDashboard = query({
       });
     }
 
+    const completedDurationsMs = rows
+      .map((row) => {
+        const { completedAtMs, startedAtMs } = row.response;
+        if (completedAtMs === undefined) return null;
+        const durationMs = completedAtMs - startedAtMs;
+        return Number.isFinite(durationMs) && durationMs >= 0
+          ? durationMs
+          : null;
+      })
+      .filter((durationMs): durationMs is number => durationMs !== null);
+
+    const averageResponseTimeMs =
+      completedDurationsMs.length > 0
+        ? Math.round(
+            completedDurationsMs.reduce((total, durationMs) => total + durationMs, 0) /
+              completedDurationsMs.length,
+          )
+        : null;
+
     return {
       survey,
       questions,
@@ -367,6 +387,7 @@ export const getSurveyResponseDashboard = query({
       ).length,
       abandonedCount: rows.filter((row) => row.response.status === "abandoned")
         .length,
+      averageResponseTimeMs,
     };
   },
 });
