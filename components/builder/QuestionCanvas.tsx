@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mic, Info } from 'lucide-react';
+import { Mic, Info, X } from 'lucide-react';
 import { QuestionTypeSelector } from './QuestionTypeSelector';
 import { EmptyCanvas } from './EmptyCanvas';
 import type { Question } from './BuilderShell';
@@ -43,6 +43,13 @@ function QuestionCanvasInner({
   const debouncedSaveOptions = useDebouncedCallback((value: string[]) => {
     onUpdate(question._id, { options: value });
   }, 400);
+
+  const removeOption = (index: number) => {
+    const next = options.filter((_, optionIndex) => optionIndex !== index);
+    const safeNext = next.length > 0 ? next : [''];
+    setOptions(safeNext);
+    onUpdate(question._id, { options: safeNext });
+  };
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden bg-muted/30">
@@ -140,6 +147,14 @@ function QuestionCanvasInner({
                         className="h-8 text-sm"
                         placeholder={`Option ${i + 1}`}
                       />
+                      <button
+                        type="button"
+                        onClick={() => removeOption(i)}
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        aria-label={`Remove option ${i + 1}`}
+                      >
+                        <X className="size-4" />
+                      </button>
                     </div>
                   ))}
                   <button
