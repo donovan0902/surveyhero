@@ -491,8 +491,7 @@ function OpenEndedInsight({
       <p className="text-xs text-muted-foreground">No responses yet — themes will appear once respondents answer.</p>
     );
   }
-  const { rootSummary, themeDistribution } = aggregate.aggregate;
-  const total = themeDistribution.reduce((sum, t) => sum + t.count, 0);
+  const { rootSummary, themeDistribution, responseCountAtBuild } = aggregate.aggregate;
 
   if (themeDistribution.length === 0) {
     return (
@@ -501,7 +500,7 @@ function OpenEndedInsight({
   }
 
   const top = themeDistribution.slice(0, 8);
-  const max = top[0]?.count ?? 1;
+  const sampleSize = responseCountAtBuild > 0 ? responseCountAtBuild : top[0]?.count ?? 1;
 
   return (
     <div className="flex flex-col gap-3">
@@ -512,8 +511,8 @@ function OpenEndedInsight({
             key={theme.themeKey}
             label={theme.label}
             count={theme.count}
-            total={total}
-            widthPercent={(theme.count / max) * 100}
+            total={sampleSize}
+            widthPercent={(theme.count / sampleSize) * 100}
             sampleQuote={theme.sampleQuotes[0]}
           />
         ))}
@@ -557,7 +556,7 @@ function ThemeBar({
           {label}
         </div>
         <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary/80" style={{ width: `${widthPercent}%` }} />
+          <div className="h-full rounded-full bg-primary/80" style={{ width: `${Math.min(widthPercent, 100)}%` }} />
         </div>
         <div className="w-16 shrink-0 text-right font-mono text-xs text-muted-foreground">
           {count} · {pct}%
