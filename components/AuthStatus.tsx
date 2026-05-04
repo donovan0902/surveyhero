@@ -3,6 +3,7 @@
 import { Authenticated, AuthLoading, Unauthenticated } from 'convex/react';
 import { useAuth } from '@workos-inc/authkit-nextjs/components';
 import Link from 'next/link';
+import { ModeToggle } from '@/components/mode-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 
@@ -18,6 +19,7 @@ export function AuthStatus() {
 
   return (
     <>
+      <ModeToggle />
       <AuthLoading>
         <div className="h-7 w-24 animate-pulse rounded bg-muted" />
       </AuthLoading>

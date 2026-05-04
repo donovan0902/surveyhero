@@ -15,8 +15,9 @@ export default async function Home() {
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="relative min-h-screen">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_30%),radial-gradient(circle_at_82%_8%,oklch(0.872_0.007_219.6/_0.75),transparent_24%),linear-gradient(135deg,oklch(1_0_0),oklch(0.963_0.002_197.1))]" />
-        <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full border border-primary/10 bg-background/30 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,color-mix(in_oklch,var(--primary)_22%,transparent),transparent_30%),radial-gradient(circle_at_82%_8%,oklch(0.872_0.007_219.6/_0.75),transparent_24%),linear-gradient(135deg,oklch(1_0_0),oklch(0.963_0.002_197.1))] dark:hidden" />
+        <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_18%_18%,color-mix(in_oklch,var(--primary)_24%,transparent),transparent_30%),radial-gradient(circle_at_82%_8%,oklch(0.378_0.015_216/_0.45),transparent_26%),linear-gradient(135deg,oklch(0.148_0.004_228.8),oklch(0.218_0.008_223.9))] dark:block" />
+        <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full border border-primary/10 bg-background/30 blur-3xl dark:bg-primary/10" />
 
         <header className="relative z-10 mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
@@ -57,7 +58,7 @@ function LandingPreview() {
   return (
     <div className="relative mx-auto w-full max-w-xl">
       <div className="absolute -inset-6 rounded-[2rem] bg-primary/10 blur-3xl" />
-      <Card className="relative border-border bg-background/85 shadow-2xl backdrop-blur">
+      <Card className="relative border-border bg-background/85 shadow-2xl backdrop-blur dark:bg-card/90">
         <CardHeader className="border-b px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">

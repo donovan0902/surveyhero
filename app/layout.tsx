@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ConvexClientProvider } from '@/components/ConvexClientProvider';
+import { ThemeProvider } from '@/components/theme-provider';
 import { withAuth } from '@workos-inc/authkit-nextjs';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -29,12 +30,14 @@ export default async function RootLayout({
   const { accessToken, ...initialAuth } = auth;
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ConvexClientProvider expectAuth={!!accessToken} initialAuth={initialAuth}>
-          {children}
-          <Toaster />
-        </ConvexClientProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ConvexClientProvider expectAuth={!!accessToken} initialAuth={initialAuth}>
+            {children}
+            <Toaster />
+          </ConvexClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
