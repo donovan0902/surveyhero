@@ -8,6 +8,7 @@ import { Eye, Inbox, LayoutDashboard, Link2, Mic, Send, Loader2 } from 'lucide-r
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ButtonGroup } from '@/components/ui/button-group';
 import { SurveyPreviewDrawer } from '@/components/builder/SurveyPreviewDrawer';
 import { Separator } from '@/components/ui/separator';
 import { AuthStatus } from '@/components/AuthStatus';
@@ -92,12 +93,12 @@ export function BuilderTopBar({
           placeholder="Survey title..."
         />
 
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+          <Link href="/dashboard">
             <LayoutDashboard className="size-3.5" />
             Dashboard
-          </Button>
-        </Link>
+          </Link>
+        </Button>
 
         <div className="flex-1" />
 
@@ -111,31 +112,39 @@ export function BuilderTopBar({
           {saveStatus === 'saving' ? 'Saving...' : 'Saved'}
         </Badge>
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled={!canPreview}
-          title={!canPreview ? 'Add at least one question to preview' : undefined}
-          onClick={() => setPreviewOpen(true)}
-        >
-          <Eye className="size-3.5" />
-          Preview
-        </Button>
-
-        {isPublished ? (
-          <Button variant="outline" size="sm" onClick={handleShare} title="Copy response link" className="gap-1.5">
-            <Link2 className="size-3.5" />
-            {copied ? 'Copied' : 'Share'}
+        <ButtonGroup>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!canPreview}
+            title={!canPreview ? 'Add at least one question to preview' : undefined}
+            onClick={() => setPreviewOpen(true)}
+          >
+            <Eye className="size-3.5" />
+            Preview
           </Button>
-        ) : null}
 
-        <Link href={`/surveys/${survey._id}/responses`}>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Inbox className="size-3.5" />
-            Responses
+          {isPublished ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              title="Copy response link"
+              className="gap-1.5"
+            >
+              <Link2 className="size-3.5" />
+              {copied ? 'Copied' : 'Share'}
+            </Button>
+          ) : null}
+
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <Link href={`/surveys/${survey._id}/responses`}>
+              <Inbox className="size-3.5" />
+              Responses
+            </Link>
           </Button>
-        </Link>
+        </ButtonGroup>
 
         <Button
           size="sm"
