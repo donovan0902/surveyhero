@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { withAuth } from '@workos-inc/authkit-nextjs';
-import { ArrowRight, BarChart3, CheckCircle2, Mic, Radio, Sparkles } from 'lucide-react';
+import { ArrowRight, BarChart3, Clock3, Mic, Radio, Sparkles } from 'lucide-react';
 
 import { AuthStatus } from '@/components/AuthStatus';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,7 @@ function LandingPreview() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Radio className="size-4 text-primary" />
-              <CardTitle className="text-sm font-semibold">Customer discovery</CardTitle>
+              <CardTitle className="text-sm font-semibold">Customer discovery survey</CardTitle>
             </div>
             <Badge className="bg-emerald-600 text-white">Published</Badge>
           </div>
@@ -71,8 +71,9 @@ function LandingPreview() {
         <CardContent className="space-y-4 p-5">
           <div className="rounded-2xl border bg-card p-4">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Voice session</span>
-              <Radio className="size-4 text-primary" />
+              <Badge variant="outline" className="font-mono text-xs">
+                Q1
+              </Badge>
             </div>
             <p className="text-sm leading-6">
               “What problem were you trying to solve when you looked for this product?”
@@ -85,12 +86,17 @@ function LandingPreview() {
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <MiniMetric label="Responses" value="128" icon={<BarChart3 className="size-4" />} />
-            <MiniMetric label="Complete" value="84%" icon={<CheckCircle2 className="size-4" />} />
+            <MiniMetric label="Avg. response time" value="2m 14s" icon={<Clock3 className="size-4" />} />
             <MiniMetric label="Themes" value="12" icon={<Sparkles className="size-4" />} />
           </div>
           <div className="rounded-2xl border bg-muted/40 p-4">
-            <p className="text-xs font-medium text-muted-foreground">Top theme</p>
-            <p className="mt-1 text-sm">Teams want faster qualitative feedback without scheduling live interviews.</p>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Sparkles className="size-3.5 text-primary" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em]">Top theme</p>
+            </div>
+            <p className="mt-1.5 text-sm font-medium leading-6">
+              Teams want faster qualitative feedback without scheduling live interviews.
+            </p>
           </div>
         </CardContent>
       </Card>
