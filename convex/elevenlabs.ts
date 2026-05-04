@@ -90,6 +90,28 @@ export const saveAgentSync = internalMutation({
     });
   },
 });
+
+export const attachVoiceConversation = internalMutation({
+  args: {
+    responseId: v.id('surveyResponses'),
+    conversationId: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const response = await ctx.db.get(args.responseId);
+    if (!response) {
+      throw new Error('Survey response not found');
+    }
+    if (response.elevenLabsConversationId && response.elevenLabsConversationId !== args.conversationId) {
+      throw new Error('Survey response already has a different ElevenLabs conversation');
+    }
+    if (response.elevenLabsConversationId === args.conversationId) return;
+
+    await ctx.db.patch(args.responseId, {
+      elevenLabsConversationId: args.conversationId,
+    });
+  },
+});
+
 export const getOrCreateVoiceResponse = internalMutation({
   args: { surveyId: v.id('surveys') },
   handler: async (
@@ -444,7 +466,7 @@ export const startVoicePreview = action({
   }> => {
     const context = await ctx.runQuery(internal.elevenlabs.getOwnedSurveyAgentContext, { surveyId: args.surveyId });
     const { agentId } = await syncSurveyAgent(ctx, context);
-    const signedUrl = await getSignedUrl(agentId);
+    const { signedUrl } = await getSignedUrl(agentId);
     return {
       signedUrl,
       agentId,
@@ -469,7 +491,13 @@ export const startVoiceResponse = action({
     const context = await ctx.runQuery(internal.elevenlabs.getPublishedSurveyAgentContext, { surveyId: args.surveyId });
     const { agentId } = await syncSurveyAgent(ctx, context);
     const response = await ctx.runMutation(internal.elevenlabs.getOrCreateVoiceResponse, { surveyId: args.surveyId });
-    const signedUrl = await getSignedUrl(agentId);
+    const { signedUrl, conversationId } = await getSignedUrl(agentId, { includeConversationId: true });
+    if (conversationId) {
+      await ctx.runMutation(internal.elevenlabs.attachVoiceConversation, {
+        responseId: response.responseId,
+        conversationId,
+      });
+    }
 
     return {
       responseId: response.responseId,
@@ -600,7 +628,7 @@ function buildRecordAnswerTool(
     ].join('\n'),
     response_timeout_secs: 10,
     api_schema: {
-      url: `${siteUrl}/elevenlabs/tools/record-answer?response_id={{survey_response_id}}&conversation_id={{system__conversation_id}}`,
+      url: `${siteUrl}/elevenlabs/tools/record-answer`,
       method: 'POST',
       request_headers: {
         'X-SurveyHero-Secret': toolSecret,
@@ -741,12 +769,18 @@ async function upsertElevenLabsAgent(
   return json.agent_id;
 }
 
-async function getSignedUrl(agentId: string): Promise<string> {
+async function getSignedUrl(
+  agentId: string,
+  options: { includeConversationId?: boolean } = {},
+): Promise<{ signedUrl: string; conversationId?: string }> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
 
   const url = new URL('https://api.elevenlabs.io/v1/convai/conversation/get-signed-url');
   url.searchParams.set('agent_id', agentId);
+  if (options.includeConversationId) {
+    url.searchParams.set('include_conversation_id', 'true');
+  }
 
   const response = await fetch(url, {
     headers: { 'xi-api-key': apiKey },
@@ -760,7 +794,19 @@ async function getSignedUrl(agentId: string): Promise<string> {
   if (!json.signed_url) {
     throw new Error('ElevenLabs did not return a signed_url');
   }
-  return json.signed_url;
+  return {
+    signedUrl: json.signed_url,
+    conversationId: getConversationIdFromSignedUrl(json.signed_url),
+  };
+}
+
+function getConversationIdFromSignedUrl(signedUrl: string): string | undefined {
+  try {
+    const url = new URL(signedUrl);
+    return url.searchParams.get('conversation_id') ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function stableHash(value: unknown): string {

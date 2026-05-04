@@ -43,8 +43,8 @@ http.route({
 
 // Live server-tool endpoint called by the ElevenLabs agent each time it
 // records an answer. Auth is a static shared secret embedded in the agent
-// config as a request header. The agent supplies response_id and
-// conversation_id as URL templated dynamic variables.
+// config as a request header. ElevenLabs sends tool arguments in `parameters`
+// and includes its conversation id at the top level.
 http.route({
   path: "/elevenlabs/tools/record-answer",
   method: "POST",
@@ -63,10 +63,6 @@ http.route({
       return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
     }
 
-    const url = new URL(req.url);
-    const rawResponseId = url.searchParams.get("response_id");
-    const rawConversationId = url.searchParams.get("conversation_id");
-
     let payload: unknown;
     try {
       payload = await req.json();
@@ -75,8 +71,10 @@ http.route({
     }
 
     const body = asRecord(payload);
-    const dataCollectionId = asString(body?.data_collection_id);
-    const value = typeof body?.value === "string" ? (body.value as string) : null;
+    const parameters = asRecord(body?.parameters);
+    const toolArgs = parameters ?? body;
+    const dataCollectionId = asString(toolArgs?.data_collection_id);
+    const value = typeof toolArgs?.value === "string" ? (toolArgs.value as string) : null;
 
     if (!dataCollectionId || value === null) {
       return jsonResponse(
@@ -85,8 +83,17 @@ http.route({
       );
     }
 
-    const responseId = rawResponseId && rawResponseId.length > 0 ? rawResponseId : undefined;
-    const conversationId = rawConversationId && rawConversationId.length > 0 ? rawConversationId : undefined;
+    const url = new URL(req.url);
+    const responseId =
+      asString(toolArgs?.response_id) ??
+      asString(toolArgs?.survey_response_id) ??
+      asString(body?.response_id) ??
+      asString(body?.survey_response_id) ??
+      asString(url.searchParams.get("response_id"));
+    const conversationId =
+      asString(body?.conversation_id) ??
+      asString(toolArgs?.conversation_id) ??
+      asString(url.searchParams.get("conversation_id"));
 
     const result = await ctx.runMutation(internal.elevenlabs.recordToolAnswer, {
       ...(responseId ? { responseId } : {}),
