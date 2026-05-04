@@ -121,6 +121,25 @@ async function adjustThemeCounter(
   }
 }
 
+// Internal: top existing themes for a question, used to anchor extraction so
+// Claude reuses an established label instead of coining a near-synonym.
+export const getExistingThemesForQuestion = internalQuery({
+  args: { questionId: v.id("questions") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ themeLabel: string; count: number }[]> => {
+    const counters = await ctx.db
+      .query("themeCounters")
+      .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+      .collect();
+    return counters
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20)
+      .map((c) => ({ themeLabel: c.themeLabel, count: c.count }));
+  },
+});
+
 // Internal: load a questionResponse + its question, validating it's open-ended.
 export const getResponseForExtraction = internalQuery({
   args: { questionResponseId: v.id("questionResponses") },
@@ -245,6 +264,12 @@ export const extractThemesForResponse = internalAction({
       return;
     }
 
+    const existingThemes: { themeLabel: string; count: number }[] =
+      await ctx.runQuery(
+        internal.aggregations.getExistingThemesForQuestion,
+        { questionId: questionResponse.questionId },
+      );
+
     const client = getAnthropic();
     const message = await client.messages.create({
       model: EXTRACTION_MODEL,
@@ -298,6 +323,17 @@ export const extractThemesForResponse = internalAction({
                 responseText,
                 "",
                 "Extract the distinct themes in the answer. Each theme must be a short noun phrase that another respondent could plausibly also produce (avoid hyper-specific paraphrases). Skip filler.",
+                existingThemes.length > 0
+                  ? [
+                      "",
+                      "Existing themes already recorded for this question (with current counts):",
+                      ...existingThemes.map(
+                        (t) => `- ${t.themeLabel} (${t.count})`,
+                      ),
+                      "",
+                      "If a theme in the answer matches one of the labels above, reuse the EXACT existing label verbatim so it maps to the same theme. Only invent a new label if the answer clearly doesn't fit any existing theme.",
+                    ].join("\n")
+                  : null,
               ]
                 .filter(Boolean)
                 .join("\n"),
