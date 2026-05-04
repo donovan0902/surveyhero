@@ -167,6 +167,7 @@ export function BuilderTopBar({
       <SurveyPreviewDrawer
         surveyId={survey._id}
         surveyTitle={survey.title}
+        totalQuestions={questionCount}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
       />

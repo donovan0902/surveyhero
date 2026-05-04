@@ -27,11 +27,13 @@ type ConversationMessage = Parameters<NonNullable<Callbacks['onMessage']>>[0];
 export function SurveyPreviewDrawer({
   surveyId,
   surveyTitle,
+  totalQuestions,
   open,
   onOpenChange,
 }: {
   surveyId: Id<'surveys'>;
   surveyTitle: string;
+  totalQuestions: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -45,14 +47,22 @@ export function SurveyPreviewDrawer({
           </DrawerDescription>
         </DrawerHeader>
         <ConversationProvider>
-          <PreviewConversation surveyId={surveyId} surveyTitle={surveyTitle} />
+          <PreviewConversation surveyId={surveyId} surveyTitle={surveyTitle} totalQuestions={totalQuestions} />
         </ConversationProvider>
       </DrawerContent>
     </Drawer>
   );
 }
 
-function PreviewConversation({ surveyId, surveyTitle }: { surveyId: Id<'surveys'>; surveyTitle: string }) {
+function PreviewConversation({
+  surveyId,
+  surveyTitle,
+  totalQuestions: initialTotalQuestions,
+}: {
+  surveyId: Id<'surveys'>;
+  surveyTitle: string;
+  totalQuestions: number;
+}) {
   const { startSession, endSession } = useConversationControls();
   const { status: conversationStatus, message: statusMessage } = useConversationStatus();
   const mode = useConversationMode();
@@ -66,7 +76,7 @@ function PreviewConversation({ surveyId, surveyTitle }: { surveyId: Id<'surveys'
   const currentStatus = getAgentStatus(status, conversationStatus, mode);
   const isSessionActive = currentStatus !== 'idle' && currentStatus !== 'error';
   const currentQuestion = Math.max(1, transcript.filter((e) => e.role === 'agent').length);
-  const totalQuestions = session?.totalQuestions ?? 1;
+  const totalQuestions = session?.totalQuestions ?? initialTotalQuestions;
 
   async function handleStart() {
     setStatus('connecting');
