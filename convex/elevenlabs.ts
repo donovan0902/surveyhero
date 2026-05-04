@@ -602,18 +602,10 @@ function buildRecordAnswerTool(
     api_schema: {
       url: `${siteUrl}/elevenlabs/tools/record-answer?response_id={{survey_response_id}}&conversation_id={{system__conversation_id}}`,
       method: 'POST',
-      request_headers: [
-        {
-          type: 'value',
-          name: 'X-SurveyHero-Secret',
-          value: toolSecret,
-        },
-        {
-          type: 'value',
-          name: 'Content-Type',
-          value: 'application/json',
-        },
-      ],
+      request_headers: {
+        'X-SurveyHero-Secret': toolSecret,
+      },
+      content_type: 'application/json',
       request_body_schema: {
         type: 'object',
         required: ['data_collection_id', 'value'],
