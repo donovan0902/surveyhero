@@ -83,7 +83,8 @@ function RespondConversation({ surveyId }: { surveyId: Id<'surveys'> }) {
     api.surveyResponses.getRespondProgress,
     session ? { responseId: session.responseId } : 'skip',
   );
-  const totalQuestions = progress?.totalQuestions ?? session?.totalQuestions ?? 1;
+  const questions = useQuery(api.questions.listForSurvey, { surveyId });
+  const totalQuestions = progress?.totalQuestions ?? session?.totalQuestions ?? questions?.length ?? 1;
   const currentQuestion = progress?.currentQuestionOrder ?? 1;
 
   async function handleStart() {
