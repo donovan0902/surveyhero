@@ -143,18 +143,16 @@ export const getOrCreateVoiceResponse = internalMutation({
         if (existing.status === 'completed') {
           throw new ConvexError('Survey response already completed');
         }
-        // Restart an abandoned response from question 1. Existing questionResponses
-        // rows from the prior attempt are NOT deleted — they will be overwritten as
-        // the agent progresses. If the respondent abandons again mid-way, answers
-        // beyond their stopping point will reflect the previous attempt until
-        // overwritten. A future clean-restart path would delete those stale rows here.
-        if (existing.status === 'abandoned') {
-          await ctx.db.patch(existing._id, {
-            status: 'in-progress',
-            startedAtMs: Date.now(),
-            ...(firstQuestion ? { currentQuestionId: firstQuestion._id } : {}),
-          });
-        }
+        // Restart from question 1 for any non-completed response. Always clear the
+        // prior conversation id so a fresh voice session can attach. Existing
+        // questionResponses rows are NOT deleted — they will be overwritten as the
+        // agent progresses. A future clean-restart path would delete those stale rows here.
+        await ctx.db.patch(existing._id, {
+          status: 'in-progress',
+          startedAtMs: Date.now(),
+          elevenLabsConversationId: undefined,
+          ...(firstQuestion ? { currentQuestionId: firstQuestion._id } : {}),
+        });
         return { responseId: existing._id, respondentId: user._id };
       }
     }
