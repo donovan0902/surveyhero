@@ -571,7 +571,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
           temperature: 0.5,
-          tools: [buildRecordAnswerTool(siteUrl, toolSecret, questions)],
+          tools: [buildRecordAnswerTool(siteUrl, toolSecret, survey._id, questions)],
           built_in_tools: {
             end_call: {
               name: 'end_call',
@@ -601,6 +601,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
 function buildRecordAnswerTool(
   siteUrl: string,
   toolSecret: string,
+  surveyId: Id<'surveys'>,
   questions: Doc<'questions'>[],
 ): Record<string, unknown> {
   const dataCollectionIds = questions.map((question) => getDataCollectionId(question));
@@ -633,7 +634,7 @@ function buildRecordAnswerTool(
     ].join('\n'),
     response_timeout_secs: 10,
     api_schema: {
-      url: `${siteUrl}/elevenlabs/tools/record-answer`,
+      url: `${siteUrl}/elevenlabs/tools/record-answer?survey_id=${surveyId}`,
       method: 'POST',
       request_headers: {
         'X-SurveyHero-Secret': toolSecret,
@@ -744,6 +745,24 @@ function getDataCollectionId(question: Doc<'questions'>): string {
   const idSuffix = question._id.replace(/[^a-zA-Z0-9_]/g, '_').slice(-12);
   return `q${question.order}_${idSuffix}`;
 }
+
+// Used by the HTTP handler for preview sessions: computes nextQuestion without any DB writes.
+export const getNextQuestionForPreview = internalQuery({
+  args: { surveyId: v.string(), dataCollectionId: v.string() },
+  handler: async (ctx, { surveyId, dataCollectionId }) => {
+    const normalizedSurveyId = ctx.db.normalizeId('surveys', surveyId);
+    if (!normalizedSurveyId) return null;
+    const questions = await ctx.db
+      .query('questions')
+      .withIndex('by_surveyId_and_order', (q) => q.eq('surveyId', normalizedSurveyId))
+      .order('asc')
+      .collect();
+    const current = questions.find((q) => getDataCollectionId(q) === dataCollectionId);
+    if (!current) return null;
+    const next = questions.find((q) => q.order > current.order) ?? null;
+    return next ? { id: next._id, prompt: next.prompt, order: next.order } : null;
+  },
+});
 
 async function upsertElevenLabsAgent(
   existingAgentId: string | undefined,

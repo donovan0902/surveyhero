@@ -94,6 +94,18 @@ http.route({
       asString(body?.conversation_id) ??
       asString(url.searchParams.get("conversation_id"));
 
+    // Preview sessions have no responseId and no conversationId. Return a successful response
+    // with the correct nextQuestion so the agent advances — a non-2xx causes ElevenLabs to
+    // treat the call as failed and the agent's prompt will loop trying to record the answer.
+    if (!responseId && !conversationId) {
+      const surveyId = url.searchParams.get("survey_id") ?? '';
+      const nextQuestion = await ctx.runQuery(internal.elevenlabs.getNextQuestionForPreview, {
+        surveyId,
+        dataCollectionId,
+      });
+      return jsonResponse({ ok: true, nextQuestion }, 200);
+    }
+
     const result = await ctx.runMutation(internal.elevenlabs.recordToolAnswer, {
       ...(responseId ? { responseId } : {}),
       ...(conversationId ? { conversationId } : {}),
