@@ -9,7 +9,7 @@ type SurveyAgentContext = {
   questions: Doc<'questions'>[];
 };
 
-const DEFAULT_LLM = 'gemini-2.5-flash';
+const DEFAULT_LLM = 'gemini-3-flash-preview';
 const DEFAULT_VOICE_ID = 'XcXEQzuLXRU9RcfWzEJt';
 const MAX_DATA_COLLECTION_ITEMS = 25;
 
@@ -570,7 +570,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
         prompt: {
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
-          temperature: 0.5,
+          temperature: 0.75,
           tools: [buildRecordAnswerTool(siteUrl, toolSecret, survey._id, questions)],
           built_in_tools: {
             end_call: {
