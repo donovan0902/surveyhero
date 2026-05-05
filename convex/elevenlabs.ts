@@ -189,6 +189,9 @@ export const recordToolAnswer = internalMutation({
     error?: string;
     nextQuestion?: { id: Id<'questions'>; prompt: string; order: number } | null;
   }> => {
+    // normalizeId returns null for non-ID strings (e.g. 'preview' from preview sessions),
+    // so invalid responseIds fall through to the conversationId lookup and then to the
+    // not-found return below — no data is written.
     const normalizedResponseId = args.responseId ? ctx.db.normalizeId('surveyResponses', args.responseId) : null;
     const surveyResponse = await resolveSurveyResponse(ctx, {
       responseId: normalizedResponseId ?? undefined,
@@ -462,6 +465,10 @@ export const startVoicePreview = action({
     surveyTitle: string;
     totalQuestions: number;
   }> => {
+    // Preview uses the same agent and record_answer tool as a real response. No data is written
+    // because the client passes survey_response_id: 'preview', which normalizeId rejects as
+    // invalid, causing recordToolAnswer to return {ok:false} without touching the database.
+    // Do not pass a real responseId or a real conversationId here — that would write live data.
     const context = await ctx.runQuery(internal.elevenlabs.getOwnedSurveyAgentContext, { surveyId: args.surveyId });
     const { agentId } = await syncSurveyAgent(ctx, context);
     const { signedUrl } = await getSignedUrl(agentId);

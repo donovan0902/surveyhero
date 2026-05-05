@@ -84,15 +84,14 @@ http.route({
     }
 
     const url = new URL(req.url);
+    // response_id / conversation_id are ElevenLabs envelope fields, not tool parameters,
+    // so they live on body, not toolArgs. URL params are a fallback for manual testing.
     const responseId =
-      asString(toolArgs?.response_id) ??
-      asString(toolArgs?.survey_response_id) ??
       asString(body?.response_id) ??
       asString(body?.survey_response_id) ??
       asString(url.searchParams.get("response_id"));
     const conversationId =
       asString(body?.conversation_id) ??
-      asString(toolArgs?.conversation_id) ??
       asString(url.searchParams.get("conversation_id"));
 
     const result = await ctx.runMutation(internal.elevenlabs.recordToolAnswer, {

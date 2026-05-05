@@ -39,7 +39,7 @@ export function SurveyPreviewDrawer({
 }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="flex flex-col">
+      <DrawerContent className="flex flex-col overflow-hidden [&>div:first-child]:hidden">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Preview Survey</DrawerTitle>
           <DrawerDescription className="sr-only">
@@ -87,6 +87,8 @@ function PreviewConversation({
       setSession(s);
       startSession({
         signedUrl: s.signedUrl,
+        // 'preview' is not a valid surveyResponse ID; recordToolAnswer will reject it and
+        // return {ok:false} without writing any data, keeping preview sessions read-only.
         dynamicVariables: { survey_response_id: 'preview', survey_id: surveyId },
         onConnect: () => setStatus('processing'),
         onDisconnect: () => setStatus('idle'),
@@ -133,8 +135,8 @@ function PreviewConversation({
         currentQuestion={Math.min(currentQuestion, totalQuestions)}
         totalQuestions={totalQuestions}
         isActive={isSessionActive}
-        eyebrow="Preview survey"
-        notice="Responses not saved"
+        badgeLabel="Preview"
+        badgeTooltip="Responses not saved"
       />
       {(errorMessage || statusMessage) && (
         <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-center text-xs text-destructive">

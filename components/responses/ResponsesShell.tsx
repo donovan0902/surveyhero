@@ -166,7 +166,7 @@ function ResponsesTopBar({ title, surveyId }: { title: string; surveyId: Id<'sur
 
 function ResponsesOverview({ dashboard }: { dashboard: Dashboard }) {
   return (
-    <Card className="overflow-hidden border-border bg-background shadow-sm">
+    <Card className="overflow-hidden border-border bg-background py-0 shadow-sm">
       <CardContent className="p-0">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">

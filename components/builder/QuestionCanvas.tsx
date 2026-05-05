@@ -52,8 +52,8 @@ function QuestionCanvasInner({
   };
 
   return (
-    <main className="flex flex-1 flex-col overflow-hidden bg-muted/30">
-      <ScrollArea className="flex-1">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto max-w-2xl px-8 py-10">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
