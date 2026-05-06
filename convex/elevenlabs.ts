@@ -9,7 +9,7 @@ type SurveyAgentContext = {
   questions: Doc<'questions'>[];
 };
 
-const DEFAULT_LLM = 'gemini-3-flash-preview';
+const DEFAULT_LLM = 'claude-haiku-4-5';
 const DEFAULT_VOICE_ID = 'XcXEQzuLXRU9RcfWzEJt';
 const MAX_DATA_COLLECTION_ITEMS = 25;
 
@@ -228,7 +228,17 @@ export const recordToolAnswer = internalMutation({
       response: validation.normalized,
     });
 
-    const nextQuestion = questions.find((q) => q.order > question.order) ?? null;
+    // Compute the next unanswered question by reading the current set of
+    // answers. This makes the response stable under corrections: re-answering
+    // an earlier question still points the agent at the latest gap, never
+    // backwards. currentQuestionId stays monotonic for the same reason.
+    const answers = await ctx.db
+      .query('questionResponses')
+      .withIndex('by_surveyResponseId', (q) => q.eq('surveyResponseId', surveyResponse._id))
+      .collect();
+    const answeredIds = new Set(answers.map((a) => a.questionId));
+    const nextQuestion = questions.find((q) => !answeredIds.has(q._id)) ?? null;
+
     await ctx.db.patch(surveyResponse._id, {
       currentQuestionId: nextQuestion ? nextQuestion._id : question._id,
       ...(args.conversationId && !surveyResponse.elevenLabsConversationId
@@ -304,7 +314,28 @@ function validateAndCoerceValue(question: Doc<'questions'>, raw: string): Valida
   return { ok: true, normalized: trimmed };
 }
 
+// Webhook entry point. Defers the actual finalization to give any final
+// in-flight record_answer HTTP request time to land — otherwise a tight race
+// can mark a response 'abandoned' moments before its last required answer is
+// written.
+const POST_CALL_FINALIZE_DELAY_MS = 3000;
+
 export const handlePostCallWebhook = internalMutation({
+  args: {
+    agentId: v.string(),
+    conversationId: v.string(),
+    responseIdFromElevenLabsUserId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    await ctx.scheduler.runAfter(
+      POST_CALL_FINALIZE_DELAY_MS,
+      internal.elevenlabs.finalizePostCall,
+      args,
+    );
+  },
+});
+
+export const finalizePostCall = internalMutation({
   args: {
     agentId: v.string(),
     conversationId: v.string(),
@@ -433,14 +464,22 @@ async function upsertQuestionAnswer(
   };
 
   let questionResponseId: Id<'questionResponses'>;
+  let textChanged: boolean;
   if (existing) {
-    await ctx.db.patch(existing._id, fields);
+    textChanged = existing.response !== response;
+    if (textChanged) {
+      await ctx.db.patch(existing._id, fields);
+    }
     questionResponseId = existing._id;
   } else {
+    textChanged = true;
     questionResponseId = await ctx.db.insert('questionResponses', fields);
   }
 
-  if (question.type === 'open-ended') {
+  // Only schedule extraction when the answer actually changed. Without this,
+  // every redundant record_answer call (e.g. agent retries) burns an LLM call
+  // and churns themeCounters / questionAggregates.dirty for the same text.
+  if (question.type === 'open-ended' && textChanged) {
     await ctx.scheduler.runAfter(0, internal.aggregations.extractThemesForResponse, {
       questionResponseId,
     });
@@ -650,8 +689,10 @@ function buildRecordAnswerTool(context: SurveyAgentContext): Record<string, unkn
     type: 'webhook',
     name: 'record_answer',
     description: [
-      "Record the respondent's answer to the current survey question and advance progress.",
-      'Call this exactly once after the respondent has given their answer to a question, before moving on.',
+      "Record the respondent's final answer for a specific survey question.",
+      'Call this after all required clarification or follow-up for that question is finished, before moving on.',
+      "If the respondent later corrects or re-answers an earlier question, call this again with that question's data_collection_id and the updated final value.",
+      'The response payload includes nextQuestion — the next question you should ask. It is null when every question has been answered.',
       'For closed questions you MUST pass one of the configured options verbatim — pick the option whose meaning best matches what the respondent said.',
       'If the respondent declines or skips, pass an empty string for value.',
       'Per-question value guidance:',
@@ -662,10 +703,33 @@ function buildRecordAnswerTool(context: SurveyAgentContext): Record<string, unkn
     tool_call_sound: 'typing',
     tool_call_sound_behavior: 'always',
     api_schema: {
-      url: `${siteUrl}/elevenlabs/tools/record-answer?survey_id=${survey._id}`,
+      // The webhook body only contains the declared request_body_schema parameters
+      // (data_collection_id, value). Envelope identifiers travel via query_params_schema
+      // — survey_id is a constant per tool, response_id is supplied by the client via
+      // the survey_response_id dynamic variable, and conversation_id comes from the
+      // built-in system__conversation_id dynamic variable. URL placeholders ({...})
+      // are reserved for path params and would require path_params_schema.
+      url: `${siteUrl}/elevenlabs/tools/record-answer`,
       method: 'POST',
       request_headers: {
         'X-SurveyHero-Secret': toolSecret,
+      },
+      query_params_schema: {
+        properties: {
+          survey_id: {
+            type: 'string',
+            constant_value: survey._id,
+          },
+          response_id: {
+            type: 'string',
+            dynamic_variable: 'survey_response_id',
+          },
+          conversation_id: {
+            type: 'string',
+            dynamic_variable: 'system__conversation_id',
+          },
+        },
+        required: ['survey_id', 'response_id', 'conversation_id'],
       },
       content_type: 'application/json',
       request_body_schema: {
@@ -702,15 +766,17 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     '- Do not end the conversation until the survey has finished',
 
     '# Recording Answers',
-    '- Once a respondent has adequately answered a question, you must call call the record_answer tool exactly once before moving to the next question.',
-    "- Use the question's data_collection_id exactly as shown.",
+    '- Treat record_answer as the commit point for an answer.',
+    '- If the question allows or needs a follow-up, ask the follow-up first and wait until the respondent has finished answering before calling record_answer.',
+    '- Once a respondent has given their final answer for a question, call record_answer before moving to the next question.',
+    '- Always use the data_collection_id for the question being recorded, even if the respondent goes back to correct or re-answer an earlier question.',
+    '- After every successful record_answer call, ask the question identified by nextQuestion in the response. If nextQuestion is null, every question has been recorded — thank the respondent and end the conversation.',
     "- For closed questions, pass exactly one configured option verbatim. Pick the option whose meaning best matches the respondent's answer.",
     '- For yes-no questions, pass exactly "yes" or "no".',
     '- For rating questions, pass the rating as an integer string, for example "4".',
     "- For open-ended questions, pass a concise answer in the respondent's own words.",
     '- If the respondent explicitly declines or skips a question, pass an empty string.',
     '- If record_answer returns ok=false, briefly re-ask the current question for a clearer answer, then call record_answer again.',
-    '- After the final question is recorded successfully, thank the respondent and end the conversation.',
 
     '# Survey',
     `Title: ${survey.title}`,
@@ -772,7 +838,7 @@ function getFollowUpInstruction(behavior: Doc<'questions'>['followUpBehavior']):
 
 function getDataCollectionId(question: Doc<'questions'>): string {
   const idSuffix = question._id.replace(/[^a-zA-Z0-9_]/g, '_').slice(-12);
-  return `q${question.order}_${idSuffix}`;
+  return `q_${idSuffix}`;
 }
 
 // Used by the HTTP handler for preview sessions: computes nextQuestion without any DB writes.

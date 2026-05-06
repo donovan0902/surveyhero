@@ -84,20 +84,24 @@ http.route({
     }
 
     const url = new URL(req.url);
-    // response_id / conversation_id are ElevenLabs envelope fields, not tool parameters,
-    // so they live on body, not toolArgs. URL params are a fallback for manual testing.
+    // ElevenLabs only includes the tool's declared parameters (data_collection_id,
+    // value) in the webhook body. We template envelope identifiers into the URL
+    // when creating the tool: response_id={{survey_response_id}} and
+    // conversation_id={{system__conversation_id}}. Body fallbacks remain for
+    // manual testing or future API changes.
     const responseId =
+      asString(url.searchParams.get("response_id")) ??
       asString(body?.response_id) ??
-      asString(body?.survey_response_id) ??
-      asString(url.searchParams.get("response_id"));
+      asString(body?.survey_response_id);
     const conversationId =
-      asString(body?.conversation_id) ??
-      asString(url.searchParams.get("conversation_id"));
+      asString(url.searchParams.get("conversation_id")) ??
+      asString(body?.conversation_id);
 
-    // Preview sessions have no responseId and no conversationId. Return a successful response
-    // with the correct nextQuestion so the agent advances — a non-2xx causes ElevenLabs to
-    // treat the call as failed and the agent's prompt will loop trying to record the answer.
-    if (!responseId && !conversationId) {
+    // Preview sessions pass the literal "preview" string for survey_response_id
+    // (see SurveyPreviewDrawer). Return a successful response with the correct
+    // nextQuestion so the agent advances — a non-2xx causes ElevenLabs to treat
+    // the call as failed and the agent's prompt loops trying to record.
+    if (responseId === "preview") {
       const surveyId = url.searchParams.get("survey_id") ?? '';
       const startedAtMs = Date.now();
       const nextQuestion = await ctx.runQuery(internal.elevenlabs.getNextQuestionForPreview, {
