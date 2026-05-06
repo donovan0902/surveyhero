@@ -99,18 +99,29 @@ http.route({
     // treat the call as failed and the agent's prompt will loop trying to record the answer.
     if (!responseId && !conversationId) {
       const surveyId = url.searchParams.get("survey_id") ?? '';
+      const startedAtMs = Date.now();
       const nextQuestion = await ctx.runQuery(internal.elevenlabs.getNextQuestionForPreview, {
         surveyId,
+        dataCollectionId,
+      });
+      console.log("ElevenLabs record_answer preview completed", {
+        durationMs: Date.now() - startedAtMs,
         dataCollectionId,
       });
       return jsonResponse({ ok: true, nextQuestion }, 200);
     }
 
+    const startedAtMs = Date.now();
     const result = await ctx.runMutation(internal.elevenlabs.recordToolAnswer, {
       ...(responseId ? { responseId } : {}),
       ...(conversationId ? { conversationId } : {}),
       dataCollectionId,
       value,
+    });
+    console.log("ElevenLabs record_answer completed", {
+      durationMs: Date.now() - startedAtMs,
+      ok: result.ok,
+      dataCollectionId,
     });
 
     return jsonResponse(result, result.ok ? 200 : 400);

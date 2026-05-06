@@ -19,7 +19,7 @@ const statusConfig: Record<AgentStatus, { label: string; dotClass: string }> = {
     dotClass: 'bg-green-500 animate-pulse',
   },
   'processing': {
-    label: 'Processing...',
+    label: 'Saving answer...',
     dotClass: 'bg-amber-400 animate-pulse',
   },
   'error': {

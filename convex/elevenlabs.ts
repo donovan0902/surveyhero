@@ -9,7 +9,7 @@ type SurveyAgentContext = {
   questions: Doc<'questions'>[];
 };
 
-const DEFAULT_LLM = 'gemini-2.5-flash';
+const DEFAULT_LLM = 'gemini-3-flash-preview';
 const DEFAULT_VOICE_ID = 'XcXEQzuLXRU9RcfWzEJt';
 const MAX_DATA_COLLECTION_ITEMS = 25;
 
@@ -570,7 +570,7 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
         prompt: {
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
-          temperature: 0.5,
+          temperature: 0.8,
           tools: [buildRecordAnswerTool(siteUrl, toolSecret, survey._id, questions)],
           built_in_tools: {
             end_call: {
@@ -633,6 +633,9 @@ function buildRecordAnswerTool(
       valueGuidance,
     ].join('\n'),
     response_timeout_secs: 10,
+    pre_tool_speech: 'auto',
+    tool_call_sound: 'typing',
+    tool_call_sound_behavior: 'always',
     api_schema: {
       url: `${siteUrl}/elevenlabs/tools/record-answer?survey_id=${surveyId}`,
       method: 'POST',
@@ -663,7 +666,7 @@ function buildRecordAnswerTool(
 function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]): string {
   return [
     '# Role',
-    'You are a voice survey interviewer for SurveyHero. Your job is to collect the respondent\'s answers accurately, one question at a time.',
+    "You are a voice survey interviewer for SurveyHero. Your job is to collect the respondent's answers accurately, one question at a time.",
 
     '# Interview Style',
     '- Ask questions in the exact order listed under Survey Questions.',
@@ -671,14 +674,15 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     '- Do not answer questions on behalf of the respondent.',
     '- Do not invent or infer survey answers when the respondent has not provided one.',
     '- If the respondent asks for clarification, briefly explain the current question without changing its meaning.',
+    '- Do not end the conversation until the survey has finished',
 
     '# Recording Answers',
     '- After the respondent answers a question, call record_answer exactly once before moving to the next question.',
-    '- Use the question\'s data_collection_id exactly as shown.',
-    '- For closed questions, pass exactly one configured option verbatim. Pick the option whose meaning best matches the respondent\'s answer.',
+    "- Use the question's data_collection_id exactly as shown.",
+    "- For closed questions, pass exactly one configured option verbatim. Pick the option whose meaning best matches the respondent's answer.",
     '- For yes-no questions, pass exactly "yes" or "no".',
     '- For rating questions, pass the rating as an integer string, for example "4".',
-    '- For open-ended questions, pass a concise answer in the respondent\'s own words.',
+    "- For open-ended questions, pass a concise answer in the respondent's own words.",
     '- If the respondent explicitly declines or skips a question, pass an empty string.',
     '- If record_answer returns ok=false, briefly re-ask the current question for a clearer answer, then call record_answer again.',
     '- After the final question is recorded successfully, thank the respondent and end the conversation.',
@@ -728,7 +732,7 @@ function getAnswerFormatInstruction(question: Doc<'questions'>): string {
   if (question.type === 'rating') {
     return 'Record an integer string.';
   }
-  return 'Record a concise answer in the respondent\'s own words.';
+  return "Record a concise answer in the respondent's own words.";
 }
 
 function getFollowUpInstruction(behavior: Doc<'questions'>['followUpBehavior']): string {

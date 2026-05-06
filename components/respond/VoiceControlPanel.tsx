@@ -23,7 +23,7 @@ export function VoiceControlPanel({ status, onStart, onStop }: VoiceControlPanel
           <MicButton status={status} onPress={isActive ? onStop : onStart} />
 
           <VoiceWaveform
-            isActive={status === 'agent-speaking' || status === 'user-speaking'}
+            isActive={status === 'agent-speaking' || status === 'user-speaking' || status === 'processing'}
             variant={status === 'user-speaking' ? 'respondent' : 'agent'}
           />
         </div>
