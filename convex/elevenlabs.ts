@@ -81,12 +81,16 @@ export const saveAgentSync = internalMutation({
     surveyId: v.id('surveys'),
     agentId: v.string(),
     configHash: v.string(),
+    recordAnswerToolId: v.string(),
+    recordAnswerToolConfigHash: v.string(),
   },
   handler: async (ctx, args): Promise<void> => {
     await ctx.db.patch(args.surveyId, {
       elevenLabsAgentId: args.agentId,
       elevenLabsAgentConfigHash: args.configHash,
       elevenLabsAgentSyncedAtMs: Date.now(),
+      elevenLabsRecordAnswerToolId: args.recordAnswerToolId,
+      elevenLabsRecordAnswerToolConfigHash: args.recordAnswerToolConfigHash,
     });
   },
 });
@@ -518,29 +522,44 @@ async function syncSurveyAgent(
   ctx: ActionCtx,
   context: SurveyAgentContext,
 ): Promise<{ agentId: string; configHash: string; synced: boolean }> {
-  const body = buildAgentCreateRequest(context);
-  const configHash = stableHash(body);
+  const recordAnswerTool = buildRecordAnswerTool(context);
+  const recordAnswerToolConfigHash = stableHash(recordAnswerTool);
+  let recordAnswerToolId = context.survey.elevenLabsRecordAnswerToolId;
+  let recordAnswerToolSynced = false;
+  if (!recordAnswerToolId || context.survey.elevenLabsRecordAnswerToolConfigHash !== recordAnswerToolConfigHash) {
+    recordAnswerToolId = await upsertElevenLabsTool(recordAnswerToolId, recordAnswerTool);
+    recordAnswerToolSynced = true;
+  }
 
-  if (context.survey.elevenLabsAgentId && context.survey.elevenLabsAgentConfigHash === configHash) {
+  const body = buildAgentCreateRequest(context, [recordAnswerToolId]);
+  const configHash = stableHash(body);
+  let agentId = context.survey.elevenLabsAgentId;
+  let agentSynced = false;
+  if (!agentId || context.survey.elevenLabsAgentConfigHash !== configHash) {
+    agentId = await upsertElevenLabsAgent(agentId, body);
+    agentSynced = true;
+  }
+
+  if (!recordAnswerToolSynced && !agentSynced) {
     return {
-      agentId: context.survey.elevenLabsAgentId,
+      agentId,
       configHash,
       synced: false,
     };
   }
 
-  const agentId = await upsertElevenLabsAgent(context.survey.elevenLabsAgentId, body);
-
   await ctx.runMutation(internal.elevenlabs.saveAgentSync, {
     surveyId: context.survey._id,
     agentId,
     configHash,
+    recordAnswerToolId,
+    recordAnswerToolConfigHash,
   });
 
   return { agentId, configHash, synced: true };
 }
 
-function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, unknown> {
+function buildAgentCreateRequest(context: SurveyAgentContext, toolIds: string[]): Record<string, unknown> {
   const { survey, questions } = context;
   if (questions.length === 0) {
     throw new Error('Cannot create a voice agent for a survey with no questions');
@@ -551,27 +570,19 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
     );
   }
 
-  const siteUrl = process.env.CONVEX_SITE_URL;
-  if (!siteUrl) {
-    throw new Error('CONVEX_SITE_URL is not configured');
-  }
-  const toolSecret = process.env.ELEVENLABS_TOOL_SECRET;
-  if (!toolSecret) {
-    throw new Error('ELEVENLABS_TOOL_SECRET is not configured');
-  }
-
   return {
     name: `SurveyHero - ${survey.title}`,
     tags: ['surveyhero', `survey_${survey._id}`],
     conversation_config: {
+      turn: { turnEagerness: 'eager' },
       agent: {
-        first_message: `Thanks for taking the survey. I'll ask a few questions and keep track of your answers. First question: ${questions[0].prompt}`,
+        first_message: `Thanks for taking the survey. I'll ask a few questions and keep track of your answers. You can end the survey at any time by clicking the red button. First question: ${questions[0].prompt}`,
         language: 'en',
         prompt: {
           prompt: buildSurveyPrompt(survey, questions),
           llm: process.env.ELEVENLABS_AGENT_LLM ?? DEFAULT_LLM,
           temperature: 0.8,
-          tools: [buildRecordAnswerTool(siteUrl, toolSecret, survey._id, questions)],
+          tool_ids: toolIds,
           built_in_tools: {
             end_call: {
               name: 'end_call',
@@ -598,12 +609,26 @@ function buildAgentCreateRequest(context: SurveyAgentContext): Record<string, un
   };
 }
 
-function buildRecordAnswerTool(
-  siteUrl: string,
-  toolSecret: string,
-  surveyId: Id<'surveys'>,
-  questions: Doc<'questions'>[],
-): Record<string, unknown> {
+function buildRecordAnswerTool(context: SurveyAgentContext): Record<string, unknown> {
+  const { survey, questions } = context;
+  if (questions.length === 0) {
+    throw new Error('Cannot create a record_answer tool for a survey with no questions');
+  }
+  if (questions.length > MAX_DATA_COLLECTION_ITEMS) {
+    throw new Error(
+      `ElevenLabs data collection supports up to ${MAX_DATA_COLLECTION_ITEMS} questions in this v1 integration`,
+    );
+  }
+
+  const siteUrl = process.env.CONVEX_SITE_URL;
+  if (!siteUrl) {
+    throw new Error('CONVEX_SITE_URL is not configured');
+  }
+  const toolSecret = process.env.ELEVENLABS_TOOL_SECRET;
+  if (!toolSecret) {
+    throw new Error('ELEVENLABS_TOOL_SECRET is not configured');
+  }
+
   const dataCollectionIds = questions.map((question) => getDataCollectionId(question));
   const valueGuidance = questions
     .map((question) => {
@@ -637,7 +662,7 @@ function buildRecordAnswerTool(
     tool_call_sound: 'typing',
     tool_call_sound_behavior: 'always',
     api_schema: {
-      url: `${siteUrl}/elevenlabs/tools/record-answer?survey_id=${surveyId}`,
+      url: `${siteUrl}/elevenlabs/tools/record-answer?survey_id=${survey._id}`,
       method: 'POST',
       request_headers: {
         'X-SurveyHero-Secret': toolSecret,
@@ -677,7 +702,7 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     '- Do not end the conversation until the survey has finished',
 
     '# Recording Answers',
-    '- After the respondent answers a question, call record_answer exactly once before moving to the next question.',
+    '- Once a respondent has adequately answered a question, you must call call the record_answer tool exactly once before moving to the next question.',
     "- Use the question's data_collection_id exactly as shown.",
     "- For closed questions, pass exactly one configured option verbatim. Pick the option whose meaning best matches the respondent's answer.",
     '- For yes-no questions, pass exactly "yes" or "no".',
@@ -795,6 +820,40 @@ async function upsertElevenLabsAgent(
   const json = (await response.json()) as { agent_id?: string };
   if (!json.agent_id) throw new Error('ElevenLabs did not return an agent_id');
   return json.agent_id;
+}
+
+async function upsertElevenLabsTool(
+  existingToolId: string | undefined,
+  toolConfig: Record<string, unknown>,
+): Promise<string> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+
+  const sendRequest = async (toolId: string | undefined) =>
+    fetch(
+      toolId ? `https://api.elevenlabs.io/v1/convai/tools/${toolId}` : 'https://api.elevenlabs.io/v1/convai/tools',
+      {
+        method: toolId ? 'PATCH' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey,
+        },
+        body: JSON.stringify({ tool_config: toolConfig }),
+      },
+    );
+
+  let response = await sendRequest(existingToolId);
+  if (existingToolId && response.status === 404) {
+    response = await sendRequest(undefined);
+  }
+
+  if (!response.ok) {
+    throw new Error(`ElevenLabs tool sync failed (${response.status}): ${await response.text()}`);
+  }
+
+  const json = (await response.json()) as { id?: string };
+  if (!json.id) throw new Error('ElevenLabs did not return a tool id');
+  return json.id;
 }
 
 async function getSignedUrl(

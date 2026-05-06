@@ -24,6 +24,8 @@ export default defineSchema({
     elevenLabsAgentId: v.optional(v.string()),
     elevenLabsAgentConfigHash: v.optional(v.string()),
     elevenLabsAgentSyncedAtMs: v.optional(v.number()),
+    elevenLabsRecordAnswerToolId: v.optional(v.string()),
+    elevenLabsRecordAnswerToolConfigHash: v.optional(v.string()),
   }).index("by_creatorId", ["creatorId"]),
 
   // Separate table so questionResponses can be indexed per-question.
