@@ -763,11 +763,12 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     '- Do not answer questions on behalf of the respondent.',
     '- Do not invent or infer survey answers when the respondent has not provided one.',
     '- If the respondent asks for clarification, briefly explain the current question without changing its meaning.',
+    '- If the respondent goes off-topic or tries to engage in general conversation, politely redirect them to the current survey question.',
     '- Do not end the conversation until the survey has finished',
 
     '# Recording Answers',
     '- Treat record_answer as the commit point for an answer.',
-    '- If the question allows or needs a follow-up, ask the follow-up first and wait until the respondent has finished answering before calling record_answer.',
+    '- Only ask a follow-up if the question\'s follow_up is not "none" AND the respondent\'s answer is genuinely unclear or incomplete. If the answer is already clear and sufficient, skip any follow-up and call record_answer immediately.',
     '- Once a respondent has given their final answer for a question, call record_answer before moving to the next question.',
     '- Always use the data_collection_id for the question being recorded, even if the respondent goes back to correct or re-answer an earlier question.',
     '- After every successful record_answer call, ask the question identified by nextQuestion in the response. If nextQuestion is null, every question has been recorded — thank the respondent and end the conversation.',
@@ -776,7 +777,7 @@ function buildSurveyPrompt(survey: Doc<'surveys'>, questions: Doc<'questions'>[]
     '- For rating questions, pass the rating as an integer string, for example "4".',
     "- For open-ended questions, pass a concise answer in the respondent's own words.",
     '- If the respondent explicitly declines or skips a question, pass an empty string.',
-    '- If record_answer returns ok=false, briefly re-ask the current question for a clearer answer, then call record_answer again.',
+    '- If record_answer returns ok=false (a validation error, e.g. an unrecognized option), acknowledge the issue briefly and re-ask the current question so the respondent can give a valid answer, then call record_answer again.',
 
     '# Survey',
     `Title: ${survey.title}`,
@@ -828,10 +829,10 @@ function getAnswerFormatInstruction(question: Doc<'questions'>): string {
 
 function getFollowUpInstruction(behavior: Doc<'questions'>['followUpBehavior']): string {
   if (behavior === 'probe-once') {
-    return 'Ask at most one clarifying follow-up if the answer is incomplete.';
+    return 'Ask at most one clarifying follow-up, but only if the answer is genuinely unclear or incomplete. If the answer is clear, record it without probing.';
   }
   if (behavior === 'probe-until-answered') {
-    return 'Continue with brief clarifying follow-ups until the respondent gives an answer or explicitly declines.';
+    return 'Continue probing with brief clarifying follow-ups only while the answer remains unclear or incomplete. Stop as soon as the answer is clear or the respondent explicitly declines.';
   }
   return 'Do not ask a follow-up unless the respondent asks for clarification.';
 }
