@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { withAuth } from '@workos-inc/authkit-nextjs';
-import { ArrowRight, BarChart3, Clock3, Mic, Radio, Sparkles } from 'lucide-react';
+import { BarChart3, Clock3, Mic, PlayCircle, Radio, Sparkles } from 'lucide-react';
 
 import { AuthStatus } from '@/components/AuthStatus';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const sampleSurveyHref = 'https://surveyhero.vercel.app/surveys/js78681vsqq740qyrmwq1yzd0x85xym2/respond';
 
 export default async function Home() {
   const { accessToken } = await withAuth();
@@ -39,9 +41,19 @@ export default async function Home() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="gap-1.5">
+                <a href={sampleSurveyHref} target="_blank" rel="noreferrer">
+                  Try a sample survey
+                  <PlayCircle className="size-4" />
+                </a>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="gap-1.5 bg-background/65 text-foreground backdrop-blur"
+              >
                 <Link href={isSignedIn ? '/dashboard' : '/sign-up'}>
                   {isSignedIn ? 'Go to dashboard' : 'Create your first survey'}
-                  <ArrowRight className="size-4" />
                 </Link>
               </Button>
             </div>
